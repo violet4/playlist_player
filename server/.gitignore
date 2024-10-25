@@ -1,0 +1,6 @@
+current_episode_number.txt
+__pycache__/
+*.m3u
+*.db
+episodes/
+*.md
