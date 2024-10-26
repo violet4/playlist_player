@@ -770,8 +770,10 @@ files = []
 develop = false
 
 [package.source]
-type = "directory"
-url = "pydub"
+type = "git"
+url = "ssh://git@github.com/jiaaro/pydub.git"
+reference = "HEAD"
+resolved_reference = "996cec42e9621701edb83354232b2c0ca0121560"
 
 [[package]]
 name = "pygments"
@@ -1386,4 +1388,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "711097099cdbc3880679fa44a7abe3c5d00913adb0cc754af1e997baa00bdb25"
+content-hash = "f74a5dffffe8225a8e9cfcc678a7a65ea1bc72ae87d923a0e937d146ca9e8aeb"
