@@ -53,7 +53,7 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
 
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:1234/audio_position");
+    const ws = new WebSocket("ws://localhost:9170/audio_position");
     ws.onmessage = function(event) {
       const new_position = event.data;
       setPosition(new_position);
