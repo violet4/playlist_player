@@ -19,6 +19,7 @@ In another terminal tab, start the frontend/client:
 
 ```
 cd client
+npm install
 npm run dev
 ```
 
