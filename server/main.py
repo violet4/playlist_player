@@ -20,7 +20,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-episodes_directory = os.path.join(this_dir, 'server', 'episodes')
+episodes_directory = os.path.join(this_dir, 'episodes')
+
 
 class EpisodePlayback(Base):
     __tablename__ = "episode_playback"
