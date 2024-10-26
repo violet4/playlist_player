@@ -6,7 +6,7 @@ See the [introduction on my blog](https://violeteldridge.com/game/gw10/).
 
 ## Install and Run
 
-This is a brand-new project (2024-10-26). If you run into any issues getting it installed and running, please [create an issue](/violet4/playlist_player/issues/new) and we'll prioritize making the application easier to install.
+This is a brand-new project (2024-10-26). If you run into any issues getting it installed and running, please [create an issue](https://github.com/violet4/playlist_player/issues/new) and we'll prioritize making the application easier to install.
 
 First, choose a directory to download this repository. You'll need [Git](https://git-scm.com/downloads). Open the command line and `cd` to the directory where you want the project:
 
