@@ -10,7 +10,7 @@ This is a brand-new project (2024-10-26). If you run into any issues getting it 
 
 First, choose a directory to download this repository. You'll need [Git](https://git-scm.com/downloads). Open the command line and `cd` to the directory where you want the project:
 
-`git clone <git@github.com>:violet4/playlist_player.git`
+`git clone git@github.com:violet4/playlist_player.git`
 
 Then `cd playlist_player`.
 
@@ -27,7 +27,7 @@ poetry run uvicorn --port 9170 server.main:app
 
 ### Frontend
 
-You'll need NPM; you should be able to easily get it for your system. See <https://nodejs.org/en/download/package-manager> for details. If you need any help, [create an issue](/violet4/playlist_player/issues/new).
+You'll need NPM; you should be able to easily get it for your system. See <https://nodejs.org/en/download/package-manager> for details. If you need any help, [create an issue](https://github.com/violet4/playlist_player/issues/new).
 
 In another terminal tab, start the frontend/client:
 
@@ -43,7 +43,7 @@ npm run dev
 
 ## Contributing
 
-The best way to get things moving forward is to star the project and create an [issue](/violet4/playlist_player/issues) with a feature request or bug report.
+The best way to get things moving forward is to star the project and [create an issue](https://github.com/violet4/playlist_player/issues/new) with a feature request or bug report.
 
 This project is very new. PRs are unlikely to get merged unless they are typo fixes, very limited and clear in scope, or explicitly requested.
 
