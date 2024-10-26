@@ -29,6 +29,8 @@ interface PodcastControlsProps {
   handleNext: () => void;
   handleSeek: (seekTime: number) => void;
   handleChangeRate: (rate: number) => void;
+  handleSeekBackward: (seekTime: number) => void;
+  handleSeekForward: (seekTime: number) => void;
 }
 
 const PodcastControls: React.FC<PodcastControlsProps> = ({
@@ -41,23 +43,20 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
   handleNext,
   handleSeek,
   handleChangeRate,
+  handleSeekForward,
+  handleSeekBackward,
 }) => {
+  console.log("re-rendering podcastcontrols")
   const [episodeNumber, setEpisodeNumber] = useState(currentEpisode);
   const [seekTime, setSeekTime] = useState(0);
   const [skipAmount, setSkipAmount] = useState(5);
-  const [position, setPosition] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(episode.rate);
 
   const PlayPauseButton = () => <button onClick={handlePlayPause}>Play/Pause</button>;
   const PauseButton = () => <button onClick={handlePause}>Pause</button>;
 
-
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:9170/audio_position");
-    ws.onmessage = function(event) {
-      const new_position = event.data;
-      setPosition(new_position);
-    };
+    console.log("podcastcontrols useeffect")
 
     // Update Media Session actions
     if ('mediaSession' in navigator) {
@@ -69,7 +68,6 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
       navigator.mediaSession.setActionHandler('seekforward', () => handleSeek(10));
     }
     return () => {
-      ws.close();
       if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('play', null);
         navigator.mediaSession.setActionHandler('pause', null);
@@ -79,10 +77,10 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
         navigator.mediaSession.setActionHandler('seekforward', null);
       }
     };
-  }, [episodeNumber, handlePause, handlePrevious, handleNext, handleSeek, onPlayEpisode]);
-  const SeekBackwardsButton = () => <button onClick={() => handleSeek(Number(position) - skipAmount)}>&lt;</button>;
+  }, [episodeNumber, handlePrevious, handleNext, onPlayEpisode]);
+  const SeekBackwardsButton = () => <button onClick={() => handleSeekBackward(skipAmount)}>&lt;</button>;
   const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{width: "5ch"}} />;
-  const SeekForwardButton = () => <button onClick={() => handleSeek(Number(position) + skipAmount)}>&gt;</button>;
+  const SeekForwardButton = () => <button onClick={() => handleSeekForward(skipAmount)}>&gt;</button>;
   const EpisodeNumberTextbox = () => <input
     type="number"
     value={episodeNumber}
@@ -119,13 +117,31 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
     <SetSkipAmountTextbox />
     <SeekForwardButton />
   </div>;
-  const CurrentPositionDisplay = formatTime(position);
   const TotalEpisodeTime = formatTime(episode.total_time);
-  const PositionDisplay = () => <div>
-    {CurrentPositionDisplay}
-    <br />
-    {TotalEpisodeTime}
-  </div>;
+  const PositionDisplay = () => {
+    const [position, setPosition] = useState(0);
+
+    useEffect(() => {
+      console.log("opening new websocket");
+      const ws = new WebSocket("ws://localhost:9170/audio_position");
+      ws.onmessage = function(event) {
+        const new_position = event.data;
+        setPosition(new_position);
+      };
+      return () => {
+        ws.close();
+      };
+
+    }, []);
+    const CurrentPositionDisplay = formatTime(position);
+    return (
+      <div>
+        {CurrentPositionDisplay}
+        <br />
+        {TotalEpisodeTime}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -167,17 +183,24 @@ const PodcastPlayer = () => {
       .then(data => setEpisode(data))
       .catch(error => console.error('Error processing response:', error));
   }
+  const processCommandSimple = (command: string, method: string = 'POST') => {
+    fetch(`/api/${command}`, {method: method})
+      .then(resp => resp.json())
+      .catch(error => console.error('Error processing response:', error));
+  }
 
   const handlePrevious = () => processCommand('previous');
   const handleNext = () => processCommand('next');
 
   const onPlayEpisode = (episodeNumber: number) => processCommand(`play/${episodeNumber}`);
-  const handlePlayPause = () => processCommand('playpause');
+  const handlePlayPause = () => processCommandSimple('playpause');
   const handlePause = () => processCommand('pause');
 
-  const handleSeek = (seekTime: number) => processCommand(`seek/${seekTime}`);
+  const handleSeek = (seekTime: number) => processCommandSimple(`seek/${seekTime}`);
+  const handleSeekForward = (seekTime: number) => processCommandSimple(`seekforward/${seekTime}`);
+  const handleSeekBackward = (seekTime: number) => processCommandSimple(`seekbackward/${seekTime}`);
 
-  const handleChangeRate = (rate: number) => processCommand(`playback_rate/${rate}`);
+  const handleChangeRate = (rate: number) => processCommandSimple(`playback_rate/${rate}`);
   useEffect(() => {
     handlePause();
   }, []);
@@ -199,6 +222,8 @@ const PodcastPlayer = () => {
         handleNext={handleNext}
         handleSeek={handleSeek}
         handleChangeRate={handleChangeRate}
+        handleSeekForward={handleSeekForward}
+        handleSeekBackward={handleSeekBackward}
       />
     </div>
   );

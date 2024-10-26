@@ -195,6 +195,20 @@ def seek_episode(time: int, db: Session = Depends(get_db)):
         return player.get_status()
 
 
+@app.post("/seekforward/{time}")
+def seek_forward(time: int):
+    if player:
+        player.seek(int(player.get_current_position()+time))
+        return player.get_status()
+
+
+@app.post("/seekbackward/{time}")
+def seek_backward(time: int):
+    if player:
+        player.seek(int(player.get_current_position()-time))
+        return player.get_status()
+
+
 @app.post("/playback_rate/{rate}")
 def set_playback_rate(rate: float=1.0):
     global playback_rate
