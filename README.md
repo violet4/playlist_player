@@ -2,6 +2,8 @@
 
 A playlist generator, manager, and player.
 
+See the [introduction on my blog](https://violeteldridge.com/game/gw10/).
+
 ## Install and Run
 
 ### Backend
