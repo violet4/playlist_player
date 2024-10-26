@@ -3,4 +3,5 @@ __pycache__/
 *.m3u
 *.db
 episodes/
-*.md
+prompt.md
+commit.md

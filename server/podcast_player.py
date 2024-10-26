@@ -33,7 +33,8 @@ class PodcastPlayer:
         return self.episodes[start:end]
 
     def get_filepath(self, episode_number: int):
-        file_path = f'episodes/sn{episode_number:>04}.mp3'
+        # TODO: don't hard-code path like this
+        file_path = f'server/episodes/sn{episode_number:>04}.mp3'
         return file_path
 
     def get_episode_info(self, episode_number: int):

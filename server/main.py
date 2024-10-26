@@ -9,16 +9,18 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Mapped, Session
 from sqlalchemy.exc import NoResultFound
 
 # Assume these modules are provided
-from audio_player import AudioPlayer
-from podcast_player import PodcastPlayer
+from .audio_player import AudioPlayer
+from .podcast_player import PodcastPlayer
 
 
 # Database Setup
-DATABASE_URL = "sqlite:///./podcast_player.db"
+DATABASE_URL = "sqlite:///./server/podcast_player.db"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+this_dir = os.path.dirname(os.path.abspath(__file__))
+episodes_directory = os.path.join(this_dir, 'server', 'episodes')
 
 class EpisodePlayback(Base):
     __tablename__ = "episode_playback"
@@ -31,7 +33,7 @@ Base.metadata.create_all(bind=engine)
 
 
 class CurrentEpisodeRememberer:
-    _episode_number_filepath = 'current_episode_number.txt'
+    _episode_number_filepath = os.path.join(this_dir, 'current_episode_number.txt')
 
     def __init__(self):
         if not os.path.exists(self._episode_number_filepath):
@@ -58,10 +60,10 @@ def download_episode(url: str) -> str:
     """Download an episode from a URL into a local 'episodes' folder."""
     filename = url.split('/')[-1]
 
-    if not os.path.exists('episodes'):
-        os.makedirs('episodes')
+    if not os.path.exists(episodes_directory):
+        os.makedirs(episodes_directory)
 
-    file_path = os.path.join('episodes', filename)
+    file_path = os.path.join(episodes_directory, filename)
 
     if not os.path.exists(file_path):
         # Download the file if it does not exist
@@ -92,7 +94,7 @@ def get_or_create_playback_record(db, episode_number):
     return playback_record
 
 
-with open('./your_playlist.m3u', 'r') as fr:
+with open('./server/your_playlist.m3u', 'r') as fr:
     podcast_playlist = PodcastPlayer(fr.read())
 
 
