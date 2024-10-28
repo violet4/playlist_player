@@ -2,14 +2,14 @@ import os
 from contextlib import contextmanager
 import asyncio
 
+from pydub import AudioSegment
+
 import requests
-from fastapi import FastAPI, HTTPException, Query, Depends, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Depends, WebSocket, Response
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Mapped, Session
 from sqlalchemy.exc import NoResultFound
 
-# Assume these modules are provided
-from .audio_player import AudioPlayer
 from .podcast_player import PodcastPlayer
 
 
@@ -102,18 +102,10 @@ with open('./server/your_playlist.m3u', 'r') as fr:
 playback_rate: float = 1.0  # TODO: save in db and persist after restart?
 cer = CurrentEpisodeRememberer()
 episode = podcast_playlist.get_episode_info(cer.current_episode)
-player = AudioPlayer(
-    file_path=episode['file_path'],
-    episode_number=episode['number'],
-    title=episode['title'],
-    description=episode['description'],
-)
-
 
 with contextmanager(get_db)() as db:
     db_rec = get_or_create_playback_record(db, cer.current_episode)
     print("db_rec.playback_position:", db_rec.playback_position)
-    player.seek(int(db_rec.playback_position))
 
 
 # FastAPI App
@@ -128,42 +120,28 @@ def play_episode(episode_number: str, db: Session = Depends(get_db)):
     if not episode_info:
         raise HTTPException(status_code=404, detail="Episode not found")
 
-    if player is not None and player.is_playing():
-        player.pause()
-
     filepath = download_episode(episode_info['url'])
-    player = AudioPlayer(filepath, int(episode_number), episode_info['title'], episode_info['description'])
-    player.set_rate(playback_rate)
-    player.play()
 
     playback_record = get_or_create_playback_record(db, episode_number)
-    if playback_record.playback_position > 0:
-        player.seek(int(playback_record.playback_position))
 
     cer.current_episode = int(episode_number)
-    return player.get_status() 
 
 
-@app.post("/pause")
-def pause_playback(db: Session = Depends(get_db)):
-    if player:
-        player.pause()
-        if cer.current_episode:
-            playback_record = get_or_create_playback_record(db, cer.current_episode)
-            playback_record.playback_position = player.get_current_position()
-            db.commit()
-        return player.get_status()
+@app.get("/current")
+def get_current_episode(db: Session = Depends(get_db)):
+    if cer.current_episode:
+        db_rec = get_or_create_playback_record(db, cer.current_episode)
+        return {
+            'episode_number': cer.current_episode,
+            'current_time': db_rec.playback_position,
+        }
+    else:
+        raise HTTPException(status_code=400, detail="No current episode")
 
 
-@app.post("/playpause")
-def playpause_playback(db: Session = Depends(get_db)):
-    if player:
-        player.playpause()
-        if cer.current_episode:
-            playback_record = get_or_create_playback_record(db, cer.current_episode)
-            playback_record.playback_position = player.get_current_position()
-            db.commit()
-        return player.get_status()
+@app.put("/current/{episode_number}")
+def new_current_episode(episode_number: int):
+    cer.current_episode = episode_number
 
 
 @app.post("/next")
@@ -184,40 +162,6 @@ def previous_episode(db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No current episode")
 
 
-@app.post("/seek/{time}")
-def seek_episode(time: int, db: Session = Depends(get_db)):
-    if player:
-        player.seek(time)
-        if cer.current_episode:
-            playback_record = get_or_create_playback_record(db, cer.current_episode)
-            playback_record.playback_position = time
-            db.commit()
-        return player.get_status()
-
-
-@app.post("/seekforward/{time}")
-def seek_forward(time: int):
-    if player:
-        player.seek(int(player.get_current_position()+time))
-        return player.get_status()
-
-
-@app.post("/seekbackward/{time}")
-def seek_backward(time: int):
-    if player:
-        player.seek(int(player.get_current_position()-time))
-        return player.get_status()
-
-
-@app.post("/playback_rate/{rate}")
-def set_playback_rate(rate: float=1.0):
-    global playback_rate
-    playback_rate = rate
-    if player:
-        player.set_rate(rate)
-        return player.get_status()
-
-
 @app.get("/episodes")
 def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100)):
     episodes = podcast_playlist.list_episodes(page=page, per_page=per_page)
@@ -225,15 +169,69 @@ def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100))
 
 
 @app.websocket("/audio_position")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
+    db_rec = get_or_create_playback_record(db, cer.current_episode)
+    prev_position = 0
     await websocket.accept()
     try:
         while True:
-            position = player.get_current_position()
-            await websocket.send_text(str(position))  # Send position as string
-            await asyncio.sleep(0.5)
+            position = int((await websocket.receive_text()).split('.')[0])
+            if position != prev_position:
+                prev_position = position
+                db_rec.playback_position = position
+                db.commit()
+            # await websocket.send_text(str(position))  # Send position as string
+            await asyncio.sleep(0.1)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
         await websocket.close()
+
+
+
+
+current_audio: AudioSegment | None = None
+current_episode_name: str | None = None
+SEGMENT_DURATION = 10 * 1000  # 10 seconds in milliseconds
+
+
+def load_audio_stream(episode_name: str) -> AudioSegment:
+    global current_audio, current_episode_name
+    if current_audio is None or current_episode_name != episode_name:
+        episode_path = os.path.join("server", "episodes", f"{episode_name}.mp3")
+        print("episode_path", episode_path, os.path.abspath(episode_path))
+        current_audio = AudioSegment.from_mp3(episode_path)
+        current_episode_name = episode_name
+    return current_audio
+
+
+@app.get("/episodes/{episode_name}.m3u8")
+async def get_playlist(episode_name: str) -> Response:
+    global current_audio
+    load_audio_stream(episode_name)
+    duration = len(current_audio)
+    num_segments = duration // SEGMENT_DURATION + (1 if duration % SEGMENT_DURATION else 0)
+
+    playlist = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXT-X-MEDIA-SEQUENCE:0\n\n"
+    for i in range(num_segments):
+        playlist += f"#EXTINF:10.0,\n{episode_name}-{i:03d}.ts\n"
+    playlist += "#EXT-X-ENDLIST"
+
+    return Response(content=playlist, media_type="application/vnd.apple.mpegurl")
+
+
+@app.get("/episodes/{segment_name}.ts")
+async def get_segment(segment_name: str) -> Response:
+    global current_audio
+    episode_name, segment_number_str = segment_name.split("-")
+    segment_number = int(segment_number_str)
+    load_audio_stream(episode_name)
+
+    start_time = segment_number * SEGMENT_DURATION
+    end_time = min((segment_number + 1) * SEGMENT_DURATION, len(current_audio))
+
+    segment = current_audio[start_time:end_time]
+
+    audio_data = segment.export(format="adts").read()
+    return Response(content=audio_data, media_type="video/mp2t")
 
