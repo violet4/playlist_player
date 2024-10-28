@@ -45,7 +45,7 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
 
   useEffect(() => {
     console.log("podcastcontrols useeffect")
-    const hls = new Hls({debug: true});
+    const hls = new Hls();
 
     if (Hls.isSupported()) {
       hls.loadSource(episode_url);
