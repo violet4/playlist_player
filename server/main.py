@@ -140,8 +140,9 @@ def get_current_episode(db: Session = Depends(get_db)):
 
 
 @app.put("/current/{episode_number}")
-def new_current_episode(episode_number: int):
+def new_current_episode(episode_number: int, db: Session = Depends(get_db)):
     cer.current_episode = episode_number
+    return get_current_episode(db)
 
 
 @app.post("/next")
@@ -170,18 +171,25 @@ def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100))
 
 @app.websocket("/audio_position")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
-    db_rec = get_or_create_playback_record(db, cer.current_episode)
     prev_position = 0
+    prev_episode = 0
+    db_rec = get_or_create_playback_record(db, 1)
     await websocket.accept()
     try:
         while True:
-            position = int((await websocket.receive_text()).split('.')[0])
+            content = await websocket.receive_text()
+            if content.strip() == 'close':
+                break
+            episode, position = map(int, (await websocket.receive_text()).split(','))
+            if episode != prev_episode:
+                prev_episode = episode
+                db_rec = get_or_create_playback_record(db, episode)
             if position != prev_position:
                 prev_position = position
                 db_rec.playback_position = position
                 db.commit()
             # await websocket.send_text(str(position))  # Send position as string
-            await asyncio.sleep(0.1)
+            # await asyncio.sleep(0.1)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:

@@ -22,7 +22,7 @@ In one terminal tab, start the backend/server:
 
 ```
 poetry install
-poetry run uvicorn --port 9170 server.main:app
+./start_server.sh
 ```
 
 ### Frontend
