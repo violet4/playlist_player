@@ -142,6 +142,13 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
 
 };
 
+const GithubLink = () => {
+  return (
+    <div style={{position: 'absolute', bottom: '0px'}}>
+      <a href="https://github.com/violet4/playlist_player">Playlist Player on Github</a>
+    </div>
+  );
+};
 
 const PodcastPlayer = () => {
   const [episode, setEpisode] = useState<Episode|null>(null);
@@ -180,8 +187,8 @@ const PodcastPlayer = () => {
 
   return (
     <div>
-      <h2>Title</h2>
-      <p>Description</p>
+      <h2>#{episode.episode_number} {episode.title}</h2>
+      <p>{episode.description}</p>
 
       <PodcastControls
         episode={episode}
@@ -191,6 +198,7 @@ const PodcastPlayer = () => {
         handleNext={handleNext}
         setEpisodeNumber={setEpisodeNumber}
       />
+      <GithubLink />
     </div>
   );
 };
@@ -205,3 +213,4 @@ function App() {
 }
 
 export default App
+

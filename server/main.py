@@ -95,7 +95,7 @@ def get_or_create_playback_record(db, episode_number):
     return playback_record
 
 
-with open('./server/your_playlist.m3u', 'r') as fr:
+with open('./security_now_podcast.m3u8', 'r') as fr:
     podcast_playlist = PodcastPlayer(fr.read())
 
 
@@ -131,10 +131,12 @@ def play_episode(episode_number: str, db: Session = Depends(get_db)):
 def get_current_episode(db: Session = Depends(get_db)):
     if cer.current_episode:
         db_rec = get_or_create_playback_record(db, cer.current_episode)
-        return {
-            'episode_number': cer.current_episode,
+        episode_info = podcast_playlist.get_episode_info(cer.current_episode)
+        episode_info.update({
             'current_time': db_rec.playback_position,
-        }
+            'episode_number': cer.current_episode,
+        })
+        return episode_info
     else:
         raise HTTPException(status_code=400, detail="No current episode")
 

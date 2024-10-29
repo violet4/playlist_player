@@ -5,3 +5,5 @@ __pycache__/
 episodes/
 prompt.md
 commit.md
+*.htm
+*.m3u*

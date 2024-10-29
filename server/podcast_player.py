@@ -1,4 +1,9 @@
+import re
 import m3u8
+
+
+semicolons = re.compile(';;')
+
 
 class PodcastPlayer:
     def __init__(self, m3u_content: str):
@@ -8,22 +13,19 @@ class PodcastPlayer:
 
     def _parse_episodes(self):
         """Extract episodes with extended information from the playlist."""
-        episodes = []
+        episodes = dict()
         for segment in self.playlist.segments:
-            info = segment.title.split('|')
-            episode_number = info[0].split('-')[0].strip()
-            title = info[1].strip()
-            description = segment.uri  # Initially set URI as a placeholder
+            number_title, description = semicolons.split(segment.title)
+            episode_number, title = number_title.split(maxsplit=1)
+            episode_number = int(episode_number)
             # Attempt to extract description if set in custom attributes (depends on parser capability)
-            if hasattr(segment, 'program_id'):
-                description = segment.program_id  # Replace or modify as needed based on actual attribute
-            episodes.append({
+            episodes[episode_number] = {
                 'number': episode_number,
                 'title': title,
                 'description': description,
                 'url': segment.uri,
                 'file_path': self.get_filepath(episode_number)
-            })
+            }
         return episodes
 
     def list_episodes(self, page=1, per_page=10):
@@ -39,9 +41,8 @@ class PodcastPlayer:
 
     def get_episode_info(self, episode_number: int):
         """Get information for a specific episode by number."""
-        for episode in self.episodes:
-            if episode['number'] == str(episode_number):
-                return episode
+        if episode_number in self.episodes:
+            return self.episodes[episode_number]
         return {
             'number': 0,
             'title': 'title',
