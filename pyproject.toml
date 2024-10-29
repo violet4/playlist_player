@@ -17,6 +17,7 @@ python-vlc = "^3.0.21203"
 m3u8 = "^6.0.0"
 sqlalchemy-stubs = "^0.4"
 pydub = {git = "ssh://git@github.com/jiaaro/pydub.git"}
+tinytag = "^1.10.1"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends, WebSocket, Response
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Mapped, Session
 from sqlalchemy.exc import NoResultFound
+from tinytag import TinyTag
 
 from .podcast_player import PodcastPlayer
 
@@ -209,17 +210,27 @@ def load_audio_stream(episode_name: str) -> AudioSegment:
     global current_audio, current_episode_name
     if current_audio is None or current_episode_name != episode_name:
         episode_path = os.path.join("server", "episodes", f"{episode_name}.mp3")
-        print("episode_path", episode_path, os.path.abspath(episode_path))
         current_audio = AudioSegment.from_mp3(episode_path)
         current_episode_name = episode_name
     return current_audio
 
 
+def get_mp3_duration(filepath):
+    tag = TinyTag.get(filepath)
+    return tag.duration * 1000
+
+from threading import Thread
+
 @app.get("/episodes/{episode_name}.m3u8")
 async def get_playlist(episode_name: str) -> Response:
     global current_audio
-    load_audio_stream(episode_name)
-    duration = len(current_audio)
+    
+    # load audio in the background and return the m3u8 file immediately
+    thread = Thread(target=load_audio_stream, args=(episode_name,), daemon=True)
+    thread.start()
+
+    filepath = os.path.join('server', 'episodes', f'{episode_name}.mp3')
+    duration = int(get_mp3_duration(filepath))
     num_segments = duration // SEGMENT_DURATION + (1 if duration % SEGMENT_DURATION else 0)
 
     playlist = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXT-X-MEDIA-SEQUENCE:0\n\n"
