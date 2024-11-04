@@ -86,7 +86,7 @@ def get_db():
         db.close()
 
 
-def get_or_create_playback_record(db, episode_number):
+def get_or_create_playback_record(db: Session, episode_number: int):
     try:
         playback_record = db.query(EpisodePlayback).filter(EpisodePlayback.episode_number == episode_number).one()
     except NoResultFound:
@@ -131,7 +131,7 @@ def play_episode(episode_number: str, db: Session = Depends(get_db)):
 
 @app.get("/current")
 def get_current_episode(db: Session = Depends(get_db), episode_number: Optional[int] = Query(None)):
-    if episode_number is None:
+    if not isinstance(episode_number, int):
         episode_number = cer.current_episode
     if episode_number:
         db_rec = get_or_create_playback_record(db, episode_number)
@@ -148,7 +148,7 @@ def get_current_episode(db: Session = Depends(get_db), episode_number: Optional[
 @app.put("/current/{episode_number}")
 def new_current_episode(episode_number: int, db: Session = Depends(get_db)):
     cer.current_episode = episode_number
-    return get_current_episode(db)
+    return get_current_episode(db, episode_number)
 
 
 @app.post("/next")
