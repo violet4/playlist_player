@@ -24,7 +24,8 @@ class PodcastPlayer:
                 'title': title,
                 'description': description,
                 'url': segment.uri,
-                'file_path': self.get_filepath(episode_number)
+                'file_path': self.get_filepath(episode_number),
+                'total_time': segment.duration,
             }
         return episodes
 

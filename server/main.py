@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 import asyncio
+from typing import Optional
 
 from pydub import AudioSegment
 
@@ -129,13 +130,15 @@ def play_episode(episode_number: str, db: Session = Depends(get_db)):
 
 
 @app.get("/current")
-def get_current_episode(db: Session = Depends(get_db)):
-    if cer.current_episode:
-        db_rec = get_or_create_playback_record(db, cer.current_episode)
-        episode_info = podcast_playlist.get_episode_info(cer.current_episode)
+def get_current_episode(db: Session = Depends(get_db), episode_number: Optional[int] = Query(None)):
+    if episode_number is None:
+        episode_number = cer.current_episode
+    if episode_number:
+        db_rec = get_or_create_playback_record(db, episode_number)
+        episode_info = podcast_playlist.get_episode_info(episode_number)
         episode_info.update({
             'current_time': db_rec.playback_position,
-            'episode_number': cer.current_episode,
+            'episode_number': episode_number,
         })
         return episode_info
     else:
@@ -170,6 +173,14 @@ def previous_episode(db: Session = Depends(get_db)):
 def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100)):
     episodes = podcast_playlist.list_episodes(page=page, per_page=per_page)
     return episodes
+
+
+@app.put("/audio_position/{episode_number}/{playback_position}")
+def update_playback_position(episode_number: int, playback_position: int, db: Session = Depends(get_db)):
+    db_rec = get_or_create_playback_record(db, episode_number)
+    db_rec.playback_position = playback_position
+    db.commit()
+    return get_current_episode(db, episode_number)
 
 
 @app.websocket("/audio_position")
@@ -224,10 +235,17 @@ from threading import Thread
 @app.get("/episodes/{episode_name}.m3u8")
 async def get_playlist(episode_name: str) -> Response:
     global current_audio
-    
-    # load audio in the background and return the m3u8 file immediately
-    thread = Thread(target=load_audio_stream, args=(episode_name,), daemon=True)
-    thread.start()
+
+    episode_path = os.path.join("server", "episodes", f"{episode_name}.mp3")
+    if not os.path.exists(episode_path):
+        episode_number = int(episode_name.lstrip('sn0'))
+        episode_info = podcast_playlist.get_episode_info(episode_number)
+        download_episode(episode_info['url'])
+        load_audio_stream(episode_name)
+    else:
+        # load audio in the background and return the m3u8 file immediately
+        thread = Thread(target=load_audio_stream, args=(episode_name,), daemon=True)
+        thread.start()
 
     filepath = os.path.join('server', 'episodes', f'{episode_name}.mp3')
     duration = int(get_mp3_duration(filepath))

@@ -12,18 +12,10 @@ interface Episode {
   rate: number;
 }
 
-const formatTime = (seconds: number) => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-};
-
-
 interface PodcastControlsProps {
   episode: Episode;
   onPlayEpisode: (episodeNumber: number) => void;
-  setEpisodeNumber: (episodeNumber: number) => void;
+  setEpisodeNumber: (e: number) => number;
   handlePrevious: () => void;
   handleNext: () => void;
   episodeNumber: number;
@@ -39,8 +31,8 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
 }) => {
   const videoRef = useRef<HTMLMediaElement>();
   console.log("re-rendering podcastcontrols")
-  const [seekTime, setSeekTime] = useState(0);
   const [skipAmount, setSkipAmount] = useState(5);
+  const allowAutoplay = episode.current_time < episode.total_time;
 
 
   const episode_number = (episodeNumber || 0).toString().padStart(4, '0');
@@ -74,12 +66,23 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
       navigator.mediaSession.setActionHandler('seekforward', () => {if (videoRef.current !== undefined) videoRef.current.currentTime += skipAmount});
     }
     const ws = new WebSocket("ws://localhost:9170/audio_position");
-    setInterval(() => {
+    const interval = setInterval(() => {
       if (videoRef.current !== undefined && videoRef.current !== null && ws !== undefined && ws.readyState === WebSocket.OPEN) {
         ws.send(`${episode.episode_number},${videoRef.current.currentTime.toFixed(0)}`);
+        const total_duration = parseInt(videoRef.current.duration.toFixed(0));
+        const current_time = parseInt(videoRef.current.currentTime.toFixed(0));
+        console.log(`${current_time}/${total_duration}`)
+        if (total_duration > 0 && current_time >= total_duration) {
+          console.log("reached the end of the episode")
+          clearInterval(interval);
+          if (allowAutoplay)
+            // Argument of type '(e: number) => number' is not assignable to parameter of type 'number'
+            setEpisodeNumber((e: number) => e+1);
+         }
       }
     }, 1000)
     return () => {
+      clearInterval(interval);
       try {
         ws.send('close');
         ws.close();
@@ -100,8 +103,10 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
     return <div>Loading...</div>;
   }
 
+  // 'videoRef.current' is possibly 'undefined'
   const SeekBackwardsButton = () => <button onClick={() => {videoRef.current.currentTime -= skipAmount}}>&lt;</button>;
   const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{width: "5ch"}} />;
+  // 'videoRef.current' is possibly 'undefined'
   const SeekForwardButton = () => <button onClick={() => {videoRef.current.currentTime += skipAmount; console.log("Stuff")}}>&gt;</button>;
   const EpisodeNumberTextbox = () => <input
     type="number"
@@ -111,12 +116,6 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
   />;
   const PreviousEpisodeButton = () => <button onClick={handlePrevious}>Previous</button>;
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
-  const SetSeekTimeValueTextbox = () => <input
-    type="number"
-    value={seekTime}
-    onChange={(e) => setSeekTime(Number(e.target.value))}
-    style={{width: '5ch'}}
-  />;
   const SkipSecondsWidget = () => <div>
     <SeekBackwardsButton />
     <SetSkipAmountTextbox />
@@ -133,7 +132,8 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
       <br />
 
       <center>
-        <audio ref={videoRef} controls src={episode_url}></audio>
+        {/* ref: Type 'undefined' is not assignable to type 'HTMLAudioElement | null'. */}
+        <audio ref={videoRef} controls src={episode_url} style={{width: '100%'}} />
         <SkipSecondsWidget />
 
       </center>
@@ -160,12 +160,6 @@ const PodcastPlayer = () => {
       .then(data => setEpisode(data))
       .catch(error => console.error('Error processing response:', error));
   }
-  const processCommandSimple = (command: string, method: string = 'POST') => {
-    fetch(`/api/${command}`, {method: method})
-      .then(resp => resp.json())
-      .catch(error => console.error('Error processing response:', error));
-  }
-
   const handlePrevious = () => setEpisodeNumber(e => e-1);
   const handleNext = () => setEpisodeNumber(e => e+1);
 
@@ -189,7 +183,9 @@ const PodcastPlayer = () => {
     <div>
       <h2>#{episode.episode_number} {episode.title}</h2>
       <p>{episode.description}</p>
+      {/* <p>Total Time: {episode.total_time}</p> */}
 
+      {/* for setEpisodeNumber: Type 'Dispatch<SetStateAction<number>>' is not assignable to type '(e: number) => number' */}
       <PodcastControls
         episode={episode}
         episodeNumber={episodeNumber}
