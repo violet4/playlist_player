@@ -1,93 +1,77 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Hls from 'hls.js';
 
 interface Episode {
   title: string;
   episode_number: number;
   description: string;
- 
   status: string;
   current_time: number;
   total_time: number;
   rate: number;
 }
 
-interface PodcastControlsProps {
-  episode: Episode;
-  onPlayEpisode: (episodeNumber: number) => void;
-  setEpisodeNumber: (e: number) => number;
-  handlePrevious: () => void;
-  handleNext: () => void;
-  episodeNumber: number;
-}
+const useEpisodeMetadata = (initialEpisodeNumber: number) => {
+  const [episode, setEpisode] = useState<Episode | null>(null);
+  const [episodeNumber, setEpisodeNumber] = useState(initialEpisodeNumber);
 
-const PodcastControls: React.FC<PodcastControlsProps> = ({
-  episode,
-  onPlayEpisode,
-  handlePrevious,
-  handleNext,
-  setEpisodeNumber,
-  episodeNumber,
-}) => {
-  const videoRef = useRef<HTMLMediaElement>();
-  console.log("re-rendering podcastcontrols")
-  const [skipAmount, setSkipAmount] = useState(5);
-  const allowAutoplay = episode.current_time < episode.total_time;
+  const processCommand = (command: string, method: string = 'POST') => {
+    fetch(`/api/${command}`, { method: method })
+      .then((resp) => resp.json())
+      .then(setEpisode)
+      .catch((error) => console.error('Error processing response:', error));
+  };
 
-
-  const episode_number = (episodeNumber || 0).toString().padStart(4, '0');
-  const episode_url = `/api/episodes/sn${episode_number}.m3u8`;
+  const handlePrevious = useCallback(() => setEpisodeNumber((e) => e - 1), []);
+  const handleNext = useCallback(() => setEpisodeNumber((e) => e + 1), []);
+  const onPlayEpisode = useCallback(
+    (episodeNumber: number) => processCommand(`play/${episodeNumber}`),
+    []
+  );
 
   useEffect(() => {
-    console.log("podcastcontrols useeffect")
+    if (episodeNumber === null || episodeNumber === undefined) return;
+
+    (episodeNumber === 0
+      ? fetch('/api/current')
+      : fetch(`/api/current/${episodeNumber}`, { method: 'PUT' })
+    )
+      .then((resp) => resp.json())
+      .then((data) => {
+        setEpisode(data);
+        setEpisodeNumber(data.episode_number);
+      })
+      .catch((error) => console.error('Error processing response:', error));
+  }, [episodeNumber]);
+
+  return { episode, episodeNumber, onPlayEpisode, handlePrevious, handleNext, setEpisodeNumber };
+};
+
+const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaElement>, skipAmount: number, handlePrevious: () => void, handleNext: () => void) => {
+  useEffect(() => {
     const hls = new Hls();
 
     if (Hls.isSupported()) {
-      if (episodeNumber > 0)
-        hls.loadSource(episode_url);
-      if (videoRef.current !== null && videoRef.current !== undefined)
-        hls.attachMedia(videoRef.current);
+      hls.loadSource(`/api/episodes/sn${episode.episode_number.toString().padStart(4, '0')}.m3u8`);
+      if (videoRef.current) hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.ERROR, (err) => {
         console.log(err);
       });
-      if (videoRef.current !== undefined && videoRef.current !== null)
-        videoRef.current.currentTime = episode.current_time;
-    }
-    else {
+      if (videoRef.current) videoRef.current.currentTime = episode.current_time;
+    } else {
       console.log("HLS not supported");
     }
-    // Update Media Session actions
+
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => {if (videoRef.current !== undefined) videoRef.current.play()});
-      navigator.mediaSession.setActionHandler('pause', () => {if (videoRef.current !== undefined) videoRef.current.pause()});
+      navigator.mediaSession.setActionHandler('play', () => { if (videoRef.current) videoRef.current.play(); });
+      navigator.mediaSession.setActionHandler('pause', () => { if (videoRef.current) videoRef.current.pause(); });
       navigator.mediaSession.setActionHandler('previoustrack', handlePrevious);
       navigator.mediaSession.setActionHandler('nexttrack', handleNext);
-      navigator.mediaSession.setActionHandler('seekbackward', () => {if (videoRef.current !== undefined) videoRef.current.currentTime -= skipAmount});
-      navigator.mediaSession.setActionHandler('seekforward', () => {if (videoRef.current !== undefined) videoRef.current.currentTime += skipAmount});
+      navigator.mediaSession.setActionHandler('seekbackward', () => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; });
+      navigator.mediaSession.setActionHandler('seekforward', () => { if (videoRef.current) videoRef.current.currentTime += skipAmount; });
     }
-    const ws = new WebSocket("ws://localhost:9170/audio_position");
-    const interval = setInterval(() => {
-      if (videoRef.current !== undefined && videoRef.current !== null && ws !== undefined && ws.readyState === WebSocket.OPEN) {
-        ws.send(`${episode.episode_number},${videoRef.current.currentTime.toFixed(0)}`);
-        const total_duration = parseInt(videoRef.current.duration.toFixed(0));
-        const current_time = parseInt(videoRef.current.currentTime.toFixed(0));
-        console.log(`${current_time}/${total_duration}`)
-        if (total_duration > 0 && current_time >= total_duration) {
-          console.log("reached the end of the episode")
-          clearInterval(interval);
-          if (allowAutoplay)
-            // Argument of type '(e: number) => number' is not assignable to parameter of type 'number'
-            setEpisodeNumber((e: number) => e+1);
-         }
-      }
-    }, 1000)
+
     return () => {
-      clearInterval(interval);
-      try {
-        ws.send('close');
-        ws.close();
-      }
-      catch {}
       if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('play', null);
         navigator.mediaSession.setActionHandler('pause', null);
@@ -97,30 +81,60 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
         navigator.mediaSession.setActionHandler('seekforward', null);
       }
     };
-  }, [episode, handlePrevious, handleNext, onPlayEpisode]);
+  }, [episode, videoRef, skipAmount, handlePrevious, handleNext]);
+};
+
+const useAudioPositionUpdater = (episodeNumber: number, videoRef: React.RefObject<HTMLMediaElement>) => {
+  const prevPositionRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    const interval = setInterval(() => {
+      if (videoRef.current?.currentTime && videoRef.current.currentTime !== prevPositionRef.current) {
+        const currentPosition = Math.trunc(videoRef.current.currentTime);
+        fetch(`/api/audio_position/${episodeNumber}/${currentPosition}`, { method: 'PUT' })
+          .catch((error) => console.error('Error updating audio position:', error));
+        prevPositionRef.current = currentPosition;
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [episodeNumber, videoRef]);
+};
+
+const PodcastControls: React.FC<{
+  episode: Episode;
+  episodeNumber: number;
+  onPlayEpisode: (episodeNumber: number) => void;
+  handlePrevious: () => void;
+  handleNext: () => void;
+  setEpisodeNumber: React.Dispatch<React.SetStateAction<number>>;
+}> = ({ episode, episodeNumber, handlePrevious, handleNext, setEpisodeNumber }) => {
+  const videoRef = useRef<HTMLMediaElement>(null);
+  const [skipAmount, setSkipAmount] = useState(5);
+  const allowAutoplay = episode.current_time < episode.total_time;
+
+  useHlsPlayer(episode, videoRef, skipAmount, handlePrevious, handleNext);
+  useAudioPositionUpdater(episode.episode_number, videoRef);
+
+  useEffect(() => {
+    if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
+      setEpisodeNumber((e) => e + 1);
+    }
+  }, []);
 
   if (episodeNumber === undefined) {
     return <div>Loading...</div>;
   }
 
-  // 'videoRef.current' is possibly 'undefined'
-  const SeekBackwardsButton = () => <button onClick={() => {videoRef.current.currentTime -= skipAmount}}>&lt;</button>;
-  const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{width: "5ch"}} />;
-  // 'videoRef.current' is possibly 'undefined'
-  const SeekForwardButton = () => <button onClick={() => {videoRef.current.currentTime += skipAmount; console.log("Stuff")}}>&gt;</button>;
-  const EpisodeNumberTextbox = () => <input
-    type="number"
-    value={episodeNumber}
-    onChange={(e) => setEpisodeNumber(Number(e.target.value))}
-    style={{width: '5ch'}}
-  />;
+  const SeekBackwardsButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; }}>&lt;</button>;
+  const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{ width: '5ch' }} />;
+  const SeekForwardButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime += skipAmount; }}>&gt;</button>;
+  const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => setEpisodeNumber(Number(e.target.value))} style={{ width: '5ch' }} />;
   const PreviousEpisodeButton = () => <button onClick={handlePrevious}>Previous</button>;
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
-  const SkipSecondsWidget = () => <div>
-    <SeekBackwardsButton />
-    <SetSkipAmountTextbox />
-    <SeekForwardButton />
-  </div>;
+  const SkipSecondsWidget = () => <div><SeekBackwardsButton /><SetSkipAmountTextbox /><SeekForwardButton /></div>;
 
   return (
     <div>
@@ -130,52 +144,16 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
         <NextEpisodeButton />
       </div>
       <br />
-
       <center>
-        {/* ref: Type 'undefined' is not assignable to type 'HTMLAudioElement | null'. */}
-        <audio ref={videoRef} controls src={episode_url} style={{width: '100%'}} />
+        <audio ref={videoRef} controls src={`/api/episodes/sn${episode.episode_number.toString().padStart(4, '0')}.m3u8`} style={{ width: '100%' }} />
         <SkipSecondsWidget />
-
       </center>
-    </div>
-  );
-
-};
-
-const GithubLink = () => {
-  return (
-    <div style={{position: 'absolute', bottom: '0px'}}>
-      <a href="https://github.com/violet4/playlist_player">Playlist Player on Github</a>
     </div>
   );
 };
 
 const PodcastPlayer = () => {
-  const [episode, setEpisode] = useState<Episode|null>(null);
-  const [episodeNumber, setEpisodeNumber] = useState(0);
-
-  const processCommand = (command: string, method: string = 'POST') => {
-    fetch(`/api/${command}`, {method: method})
-      .then(resp => resp.json())
-      .then(data => setEpisode(data))
-      .catch(error => console.error('Error processing response:', error));
-  }
-  const handlePrevious = () => setEpisodeNumber(e => e-1);
-  const handleNext = () => setEpisodeNumber(e => e+1);
-
-  const onPlayEpisode = (episodeNumber: number) => processCommand(`play/${episodeNumber}`);
-
-  useEffect(() => {
-    if (episodeNumber === null || episodeNumber === undefined)
-      return;
-    (episodeNumber == 0
-      ? fetch('/api/current')
-      : fetch(`/api/current/${episodeNumber}`, {method: 'PUT'})
-    )
-      .then(resp => resp.json())
-      .then(data => {setEpisode(data); setEpisodeNumber(data.episode_number)})
-      .catch(error => console.error('Error processing response:', error));
-  }, [episodeNumber]);
+  const { episode, episodeNumber, onPlayEpisode, handlePrevious, handleNext, setEpisodeNumber } = useEpisodeMetadata(0);
 
   if (!episode) return <p>Loading...</p>;
 
@@ -183,9 +161,6 @@ const PodcastPlayer = () => {
     <div>
       <h2>#{episode.episode_number} {episode.title}</h2>
       <p>{episode.description}</p>
-      {/* <p>Total Time: {episode.total_time}</p> */}
-
-      {/* for setEpisodeNumber: Type 'Dispatch<SetStateAction<number>>' is not assignable to type '(e: number) => number' */}
       <PodcastControls
         episode={episode}
         episodeNumber={episodeNumber}
@@ -194,19 +169,17 @@ const PodcastPlayer = () => {
         handleNext={handleNext}
         setEpisodeNumber={setEpisodeNumber}
       />
-      <GithubLink />
     </div>
   );
 };
 
 function App() {
-
   return (
     <>
       <PodcastPlayer />
     </>
-  )
+  );
 }
 
-export default App
+export default App;
 

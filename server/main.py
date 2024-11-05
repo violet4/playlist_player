@@ -210,8 +210,6 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         await websocket.close()
 
 
-
-
 current_audio: AudioSegment | None = None
 current_episode_name: str | None = None
 SEGMENT_DURATION = 10 * 1000  # 10 seconds in milliseconds
