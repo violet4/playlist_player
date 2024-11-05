@@ -48,15 +48,22 @@ const useEpisodeMetadata = (initialEpisodeNumber: number) => {
 };
 
 const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaElement>, skipAmount: number, handlePrevious: () => void, handleNext: () => void) => {
-  useEffect(() => {
-    const hls = new Hls();
+  const hlsRef = useRef<Hls | null>(null);
 
+  useEffect(() => {
     if (Hls.isSupported()) {
+      const hls = new Hls();
+      hlsRef.current = hls;
+
       hls.loadSource(`/api/episodes/sn${episode.episode_number.toString().padStart(4, '0')}.m3u8`);
-      if (videoRef.current) hls.attachMedia(videoRef.current);
+      if (videoRef.current) {
+        hls.attachMedia(videoRef.current);
+      }
+
       hls.on(Hls.Events.ERROR, (err) => {
         console.log(err);
       });
+
       if (videoRef.current) videoRef.current.currentTime = episode.current_time;
     } else {
       console.log("HLS not supported");
@@ -72,6 +79,11 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
     }
 
     return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
       if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('play', null);
         navigator.mediaSession.setActionHandler('pause', null);
@@ -91,7 +103,7 @@ const useAudioPositionUpdater = (episodeNumber: number, videoRef: React.RefObjec
     if (!videoRef.current) return;
 
     const interval = setInterval(() => {
-      if (videoRef.current?.currentTime && videoRef.current.currentTime !== prevPositionRef.current) {
+      if (videoRef.current?.currentTime && Math.trunc(videoRef.current.currentTime) !== prevPositionRef.current) {
         const currentPosition = Math.trunc(videoRef.current.currentTime);
         fetch(`/api/audio_position/${episodeNumber}/${currentPosition}`, { method: 'PUT' })
           .catch((error) => console.error('Error updating audio position:', error));
