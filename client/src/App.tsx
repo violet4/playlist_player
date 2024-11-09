@@ -141,7 +141,10 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed,
       <label><input type="radio" name="speed" checked={playbackSpeed==2.0} onChange={handleSetPlaybackSpeed} />2.0</label>
       <label>
         {/* custom playback speed */}
-        <input type="radio" name="speed" checked={playbackSpeed==customPlaybackSpeed} onChange={() => setPlaybackSpeed(customPlaybackSpeed)} />
+        <input type="radio" name="speed" checked={playbackSpeed==customPlaybackSpeed} onChange={() => {
+          updateAudioPlaybackRate(customPlaybackSpeed);
+          setPlaybackSpeed(customPlaybackSpeed);
+        }} />
         <input type="number" step={0.5} value={customPlaybackSpeed} style={{width: '6ch'}}
           onChange={(e) => {
             const newCustomPlaybackSpeed = Number(e.target.value);
