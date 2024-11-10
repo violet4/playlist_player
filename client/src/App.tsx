@@ -47,7 +47,38 @@ const useEpisodeMetadata = (initialEpisodeNumber: number) => {
   return { episode, episodeNumber, onPlayEpisode, handlePrevious, handleNext, setEpisodeNumber };
 };
 
-const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaElement>, skipAmount: number, handlePrevious: () => void, handleNext: () => void) => {
+
+const useMediaSession = (
+  videoRef: React.RefObject<HTMLMediaElement>,
+  handlePrevious: () => void,
+  handleNext: () => void,
+  skipAmount: number,
+) => {
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => { if (videoRef.current) videoRef.current.play(); });
+      navigator.mediaSession.setActionHandler('pause', () => { if (videoRef.current) videoRef.current.pause(); });
+      navigator.mediaSession.setActionHandler('previoustrack', handlePrevious);
+      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+      navigator.mediaSession.setActionHandler('seekbackward', () => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; });
+      navigator.mediaSession.setActionHandler('seekforward', () => { if (videoRef.current) videoRef.current.currentTime += skipAmount; });
+    }
+    return () => {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('seekbackward', null);
+        navigator.mediaSession.setActionHandler('seekforward', null);
+      }
+    };
+
+  }, []);
+};
+
+
+const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaElement>) => {
   const hlsRef = useRef<Hls | null>(null);
   const mediaUrl = useMemo(() => `/api/episodes/sn${episode.episode_number.toString().padStart(4, '0')}.m3u8`, [episode.episode_number]);
 
@@ -70,28 +101,11 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
 
     videoRef.current.currentTime = episode.current_time;
 
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => { if (videoRef.current) videoRef.current.play(); });
-      navigator.mediaSession.setActionHandler('pause', () => { if (videoRef.current) videoRef.current.pause(); });
-      navigator.mediaSession.setActionHandler('previoustrack', handlePrevious);
-      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
-      navigator.mediaSession.setActionHandler('seekbackward', () => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; });
-      navigator.mediaSession.setActionHandler('seekforward', () => { if (videoRef.current) videoRef.current.currentTime += skipAmount; });
-    }
 
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
-      }
-
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', null);
-        navigator.mediaSession.setActionHandler('pause', null);
-        navigator.mediaSession.setActionHandler('previoustrack', null);
-        navigator.mediaSession.setActionHandler('nexttrack', null);
-        navigator.mediaSession.setActionHandler('seekbackward', null);
-        navigator.mediaSession.setActionHandler('seekforward', null);
       }
     };
   }, [episode.episode_number]);
@@ -174,8 +188,9 @@ const PodcastControls: React.FC<{
   const allowAutoplay = episode.current_time < episode.total_time;
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
-  useHlsPlayer(episode, videoRef, skipAmount, handlePrevious, handleNext);
+  useHlsPlayer(episode, videoRef);
   useAudioPositionUpdater(episode.episode_number, videoRef);
+  useMediaSession(videoRef, handlePrevious, handleNext, skipAmount);
 
   useEffect(() => {
     if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
