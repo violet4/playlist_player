@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 
+
 interface Episode {
   title: string;
   episode_number: number;
@@ -11,40 +12,46 @@ interface Episode {
   rate: number;
 }
 
-const useEpisodeMetadata = (initialEpisodeNumber: number) => {
+
+const useEpisodeData = () => {
   const [episode, setEpisode] = useState<Episode | null>(null);
-  const [episodeNumber, setEpisodeNumber] = useState(initialEpisodeNumber);
+  const [episodeNumber, setEpisodeNumber] = useState<number | null>(null);
 
-  const processCommand = (command: string, method: string = 'POST') => {
-    fetch(`/api/${command}`, { method: method })
+  const fetchEpisodeByNumber = useCallback((episodeNumber: number) => {
+    fetch(`/api/current/${episodeNumber}`, { method: 'PUT' })
       .then((resp) => resp.json())
-      .then(setEpisode)
+      .then((data) => {setEpisode(data); setEpisodeNumber(data.episode_number);})
       .catch((error) => console.error('Error processing response:', error));
-  };
-
-  const handlePrevious = useCallback(() => setEpisodeNumber((e) => e - 1), []);
-  const handleNext = useCallback(() => setEpisodeNumber((e) => e + 1), []);
-  const onPlayEpisode = useCallback(
-    (episodeNumber: number) => processCommand(`play/${episodeNumber}`),
-    []
-  );
+  }, []);
 
   useEffect(() => {
-    if (episodeNumber === null || episodeNumber === undefined) return;
-
-    (episodeNumber === 0
-      ? fetch('/api/current')
-      : fetch(`/api/current/${episodeNumber}`, { method: 'PUT' })
-    )
+    fetch('/api/current')
       .then((resp) => resp.json())
-      .then((data) => {
-        setEpisode(data);
-        setEpisodeNumber(data.episode_number);
-      })
+      .then((data) => {setEpisode(data); setEpisodeNumber(data.episode_number);})
       .catch((error) => console.error('Error processing response:', error));
-  }, [episodeNumber]);
+  }, []);
 
-  return { episode, episodeNumber, onPlayEpisode, handlePrevious, handleNext, setEpisodeNumber };
+  return { episode, episodeNumber, setEpisodeNumber, fetchEpisodeByNumber };
+};
+
+
+const useEpisodeNavigation = (
+  episodeNumber: number | null,
+  fetchEpisodeByNumber: (episodeNumber: number) => void,
+) => {
+  const handlePrevious = useCallback(() => {
+    if (episodeNumber !== null) {
+      fetchEpisodeByNumber(episodeNumber - 1);
+    }
+  }, [episodeNumber, fetchEpisodeByNumber]);
+
+  const handleNext = useCallback(() => {
+    if (episodeNumber !== null) {
+      fetchEpisodeByNumber(episodeNumber + 1);
+    }
+  }, [episodeNumber, fetchEpisodeByNumber]);
+
+  return { handlePrevious, handleNext };
 };
 
 
@@ -83,14 +90,12 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
   const mediaUrl = useMemo(() => `/api/episodes/sn${episode.episode_number.toString().padStart(4, '0')}.m3u8`, [episode.episode_number]);
 
   useEffect(() => {
-    if (!Hls.isSupported() || !videoRef.current)
+    if (!Hls.isSupported() || !videoRef.current || !episode?.episode_number)
       return;
-    console.log("useHlsPlayer useEffect for episode number", episode.episode_number);
     const hls = new Hls();
     hlsRef.current = hls;
 
     hls.loadSource(mediaUrl);
-    console.log("loading source");
     if (videoRef.current) {
       hls.attachMedia(videoRef.current);
     }
@@ -110,6 +115,7 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
     };
   }, [episode.episode_number]);
 };
+
 
 const useAudioPositionUpdater = (episodeNumber: number, videoRef: React.RefObject<HTMLMediaElement>) => {
   const prevPositionRef = useRef<number | null>(null);
@@ -136,6 +142,7 @@ interface PlaybackSpeedWidgetProps {
   setPlaybackSpeed: (speed: number) => void;
   updateAudioPlaybackRate: (rate: number) => void;
 }
+
 
 const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed, setPlaybackSpeed, updateAudioPlaybackRate}) => {
   const [customPlaybackSpeed, setCustomPlaybackSpeed] = useState<number>(1.0);
@@ -178,10 +185,9 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed,
 const PodcastControls: React.FC<{
   episode: Episode;
   episodeNumber: number;
-  onPlayEpisode: (episodeNumber: number) => void;
   handlePrevious: () => void;
   handleNext: () => void;
-  setEpisodeNumber: React.Dispatch<React.SetStateAction<number>>;
+  setEpisodeNumber: React.Dispatch<React.SetStateAction<number|null>>;
 }> = ({ episode, episodeNumber, handlePrevious, handleNext, setEpisodeNumber }) => {
   const videoRef = useRef<HTMLMediaElement>(null);
   const [skipAmount, setSkipAmount] = useState(10);
@@ -230,10 +236,21 @@ const PodcastControls: React.FC<{
   );
 };
 
-const PodcastPlayer = () => {
-  const { episode, episodeNumber, onPlayEpisode, handlePrevious, handleNext, setEpisodeNumber } = useEpisodeMetadata(0);
 
-  if (!episode) return <p>Loading...</p>;
+const PodcastPlayer = () => {
+
+  const { episode, episodeNumber, setEpisodeNumber, fetchEpisodeByNumber } = useEpisodeData();
+  const { handlePrevious, handleNext } = useEpisodeNavigation(episodeNumber, fetchEpisodeByNumber);
+
+  useEffect(() => {
+    if (episodeNumber !== null) {
+      fetchEpisodeByNumber(episodeNumber);
+    }
+  }, [episodeNumber, fetchEpisodeByNumber]);
+
+  if (!episode || !episodeNumber) {
+    return <p>Loading...</p>;
+  }
 
   return (
     <div>
@@ -242,7 +259,6 @@ const PodcastPlayer = () => {
       <PodcastControls
         episode={episode}
         episodeNumber={episodeNumber}
-        onPlayEpisode={onPlayEpisode}
         handlePrevious={handlePrevious}
         handleNext={handleNext}
         setEpisodeNumber={setEpisodeNumber}
@@ -250,6 +266,7 @@ const PodcastPlayer = () => {
     </div>
   );
 };
+
 
 function App() {
   return (
