@@ -127,7 +127,7 @@ const useAudioPositionUpdater = (episodeNumber: number, videoRef: React.RefObjec
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [episodeNumber, videoRef.current]);
+  }, [episodeNumber]);
 };
 
 
