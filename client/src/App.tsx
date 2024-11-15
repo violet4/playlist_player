@@ -104,9 +104,6 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
       console.log(err);
     });
 
-    videoRef.current.currentTime = episode.current_time;
-
-
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -182,6 +179,24 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed,
 };
 
 
+const usePlaybackTimeRecovery = (
+  playbackPosition: number|null,
+  videoRef: React.RefObject<HTMLMediaElement>,
+  canPlay: boolean,
+) => {
+
+  useEffect(() => {
+    if (playbackPosition === null || !canPlay)
+      return;
+
+    if (videoRef?.current) {
+      videoRef.current.currentTime = playbackPosition;
+    }
+  }, [playbackPosition, canPlay]);
+
+};
+
+
 const PodcastControls: React.FC<{
   episode: Episode;
   episodeNumber: number;
@@ -193,14 +208,21 @@ const PodcastControls: React.FC<{
   const [skipAmount, setSkipAmount] = useState(10);
   const allowAutoplay = episode.current_time < episode.total_time;
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  const [canPlay, setCanPlay] = useState(false);
 
   useHlsPlayer(episode, videoRef);
   useAudioPositionUpdater(episode.episode_number, videoRef);
   useMediaSession(videoRef, handlePrevious, handleNext, skipAmount);
+  usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
 
   useEffect(() => {
     if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
       setEpisodeNumber((e) => e + 1);
+    }
+    if (videoRef.current) {
+      videoRef.current.oncanplay = () => {
+        setCanPlay(true);
+      };
     }
   }, []);
 
@@ -231,7 +253,6 @@ const PodcastControls: React.FC<{
         <PlaybackSpeedWidget playbackSpeed={playbackSpeed} setPlaybackSpeed={setPlaybackSpeed}
           updateAudioPlaybackRate={updateAudioPlaybackRate}
         />
-        <button>TODO: Reset to saved position (position here)</button>
       </center>
     </div>
   );
