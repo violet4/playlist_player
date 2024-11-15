@@ -231,6 +231,7 @@ const PodcastControls: React.FC<{
         <PlaybackSpeedWidget playbackSpeed={playbackSpeed} setPlaybackSpeed={setPlaybackSpeed}
           updateAudioPlaybackRate={updateAudioPlaybackRate}
         />
+        <button>TODO: Reset to saved position (position here)</button>
       </center>
     </div>
   );
@@ -241,12 +242,6 @@ const PodcastPlayer = () => {
 
   const { episode, episodeNumber, setEpisodeNumber, fetchEpisodeByNumber } = useEpisodeData();
   const { handlePrevious, handleNext } = useEpisodeNavigation(episodeNumber, fetchEpisodeByNumber);
-
-  useEffect(() => {
-    if (episodeNumber !== null) {
-      fetchEpisodeByNumber(episodeNumber);
-    }
-  }, [episodeNumber, fetchEpisodeByNumber]);
 
   if (!episode || !episodeNumber) {
     return <p>Loading...</p>;
