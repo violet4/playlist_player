@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 
+const security_now_image_url = "https://elroy.twit.tv/sites/default/files/styles/twit_album_art_600x600/public/images/shows/security_now/album_art/sn2022_albumart_standard_2048.jpg";
 
 interface Episode {
   title: string;
@@ -57,6 +58,7 @@ const useEpisodeNavigation = (
 
 const useMediaSession = (
   videoRef: React.RefObject<HTMLMediaElement>,
+  episode: Episode,
   handlePrevious: () => void,
   handleNext: () => void,
   skipAmount: number,
@@ -69,6 +71,18 @@ const useMediaSession = (
       navigator.mediaSession.setActionHandler('nexttrack', handleNext);
       navigator.mediaSession.setActionHandler('seekbackward', () => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; });
       navigator.mediaSession.setActionHandler('seekforward', () => { if (videoRef.current) videoRef.current.currentTime += skipAmount; });
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `#${episode.episode_number} ${episode.title}`,
+        artist: "Security Now!",
+        album: "Album",
+        artwork: [
+          {
+            src: security_now_image_url,
+            sizes: "600x600",
+            type: "image/jpeg",
+          },
+        ],
+      });
     }
     return () => {
       if ('mediaSession' in navigator) {
@@ -81,7 +95,7 @@ const useMediaSession = (
       }
     };
 
-  }, []);
+  }, [episode.episode_number]);
 };
 
 
@@ -212,7 +226,7 @@ const PodcastControls: React.FC<{
 
   useHlsPlayer(episode, videoRef);
   useAudioPositionUpdater(episode.episode_number, videoRef);
-  useMediaSession(videoRef, handlePrevious, handleNext, skipAmount);
+  useMediaSession(videoRef, episode, handlePrevious, handleNext, skipAmount);
   usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
 
   useEffect(() => {
