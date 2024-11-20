@@ -16,25 +16,24 @@ interface Episode {
 
 const useEpisodeData = () => {
   const [episode, setEpisode] = useState<Episode | null>(null);
-  const [episodeNumber, setEpisodeNumber] = useState<number | null>(null);
+
+  const fetchEpisode = useCallback((url: string, method: string = 'GET') => {
+    fetch(url, { method })
+      .then((resp) => resp.json())
+      .then((data) => setEpisode(data))
+      .catch((error) => console.error('Error processing response:', error));
+  }, []);
 
   const fetchEpisodeByNumber = useCallback((episodeNumber: number) => {
-    fetch(`/api/current/${episodeNumber}`, { method: 'PUT' })
-      .then((resp) => resp.json())
-      .then((data) => {setEpisode(data); setEpisodeNumber(data.episode_number);})
-      .catch((error) => console.error('Error processing response:', error));
-  }, []);
+    fetchEpisode(`/api/current/${episodeNumber}`, 'PUT');
+  }, [fetchEpisode]);
 
   useEffect(() => {
-    fetch('/api/current')
-      .then((resp) => resp.json())
-      .then((data) => {setEpisode(data); setEpisodeNumber(data.episode_number);})
-      .catch((error) => console.error('Error processing response:', error));
-  }, []);
+    fetchEpisode('/api/current');
+  }, [fetchEpisode]);
 
-  return { episode, episodeNumber, setEpisodeNumber, fetchEpisodeByNumber };
+  return { episode, fetchEpisodeByNumber };
 };
-
 
 const useEpisodeNavigation = (
   episodeNumber: number | null,
@@ -216,8 +215,8 @@ const PodcastControls: React.FC<{
   episodeNumber: number;
   handlePrevious: () => void;
   handleNext: () => void;
-  setEpisodeNumber: React.Dispatch<React.SetStateAction<number|null>>;
-}> = ({ episode, episodeNumber, handlePrevious, handleNext, setEpisodeNumber }) => {
+  fetchEpisodeByNumber: (episodeNumber: number) => void;
+}> = ({ episode, episodeNumber, handlePrevious, handleNext, fetchEpisodeByNumber }) => {
   const videoRef = useRef<HTMLMediaElement>(null);
   const [skipAmount, setSkipAmount] = useState(10);
   const allowAutoplay = episode.current_time < episode.total_time;
@@ -229,9 +228,11 @@ const PodcastControls: React.FC<{
   useMediaSession(videoRef, episode, handlePrevious, handleNext, skipAmount);
   usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
 
+  // TODO: extract "autoplay next episode" into a custom hook
+  // TODO: extract "canPlay" into a custom hook
   useEffect(() => {
     if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
-      setEpisodeNumber((e) => e + 1);
+      fetchEpisodeByNumber(episodeNumber + 1);
     }
     if (videoRef.current) {
       videoRef.current.oncanplay = () => {
@@ -247,7 +248,7 @@ const PodcastControls: React.FC<{
   const SeekBackwardsButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; }}>&lt;</button>;
   const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{ width: '5ch' }} />;
   const SeekForwardButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime += skipAmount; }}>&gt;</button>;
-  const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => setEpisodeNumber(Number(e.target.value))} style={{ width: '5ch' }} />;
+  const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => fetchEpisodeByNumber(Number(e.target.value))} style={{ width: '5ch' }} />;
   const PreviousEpisodeButton = () => <button onClick={handlePrevious}>Previous</button>;
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
   const SkipSecondsWidget = () => <div><SeekBackwardsButton /><SetSkipAmountTextbox /><SeekForwardButton /></div>;
@@ -275,10 +276,10 @@ const PodcastControls: React.FC<{
 
 const PodcastPlayer = () => {
 
-  const { episode, episodeNumber, setEpisodeNumber, fetchEpisodeByNumber } = useEpisodeData();
-  const { handlePrevious, handleNext } = useEpisodeNavigation(episodeNumber, fetchEpisodeByNumber);
+  const { episode, fetchEpisodeByNumber } = useEpisodeData();
+  const { handlePrevious, handleNext } = useEpisodeNavigation(episode ? episode.episode_number : 0, fetchEpisodeByNumber);
 
-  if (!episode || !episodeNumber) {
+  if (!episode || !episode.episode_number) {
     return <p>Loading...</p>;
   }
 
@@ -288,10 +289,10 @@ const PodcastPlayer = () => {
       <p>{episode.description}</p>
       <PodcastControls
         episode={episode}
-        episodeNumber={episodeNumber}
+        episodeNumber={episode.episode_number}
         handlePrevious={handlePrevious}
         handleNext={handleNext}
-        setEpisodeNumber={setEpisodeNumber}
+        fetchEpisodeByNumber={fetchEpisodeByNumber}
       />
     </div>
   );
