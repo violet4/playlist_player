@@ -210,6 +210,25 @@ const usePlaybackTimeRecovery = (
 };
 
 
+const useCanPlay = (videoRef: React.RefObject<HTMLMediaElement>) => {
+  const [canPlay, setCanPlay] = useState(false);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      const handleCanPlay = () => setCanPlay(true);
+      videoRef.current.oncanplay = handleCanPlay;
+
+      return () => {
+        if (videoRef.current) {
+          videoRef.current.oncanplay = null;
+        }
+      };
+    }
+  }, [videoRef]);
+
+  return canPlay;
+};
+
 const PodcastControls: React.FC<{
   episode: Episode;
   episodeNumber: number;
@@ -221,7 +240,8 @@ const PodcastControls: React.FC<{
   const [skipAmount, setSkipAmount] = useState(10);
   const allowAutoplay = episode.current_time < episode.total_time;
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
-  const [canPlay, setCanPlay] = useState(false);
+
+  const canPlay = useCanPlay(videoRef);
 
   useHlsPlayer(episode, videoRef);
   useAudioPositionUpdater(episode.episode_number, videoRef);
@@ -229,17 +249,11 @@ const PodcastControls: React.FC<{
   usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
 
   // TODO: extract "autoplay next episode" into a custom hook
-  // TODO: extract "canPlay" into a custom hook
   useEffect(() => {
     if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
       fetchEpisodeByNumber(episodeNumber + 1);
     }
-    if (videoRef.current) {
-      videoRef.current.oncanplay = () => {
-        setCanPlay(true);
-      };
-    }
-  }, []);
+  }, [allowAutoplay, episodeNumber, fetchEpisodeByNumber]);
 
   if (episodeNumber === undefined) {
     return <div>Loading...</div>;
