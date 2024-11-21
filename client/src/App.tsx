@@ -229,6 +229,19 @@ const useCanPlay = (videoRef: React.RefObject<HTMLMediaElement>) => {
   return canPlay;
 };
 
+const useAutoProgressToNextEpisode = (
+  videoRef: React.RefObject<HTMLMediaElement>,
+  allowAutoplay: boolean,
+  episodeNumber: number,
+  fetchEpisodeByNumber: (episodeNumber: number) => void
+) => {
+  useEffect(() => {
+    if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
+      fetchEpisodeByNumber(episodeNumber + 1);
+    }
+  }, [allowAutoplay, episodeNumber, fetchEpisodeByNumber, videoRef]);
+};
+
 const PodcastControls: React.FC<{
   episode: Episode;
   episodeNumber: number;
@@ -247,13 +260,7 @@ const PodcastControls: React.FC<{
   useAudioPositionUpdater(episode.episode_number, videoRef);
   useMediaSession(videoRef, episode, handlePrevious, handleNext, skipAmount);
   usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
-
-  // TODO: extract "autoplay next episode" into a custom hook
-  useEffect(() => {
-    if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
-      fetchEpisodeByNumber(episodeNumber + 1);
-    }
-  }, [allowAutoplay, episodeNumber, fetchEpisodeByNumber]);
+  useAutoProgressToNextEpisode(videoRef, allowAutoplay, episodeNumber, fetchEpisodeByNumber);
 
   if (episodeNumber === undefined) {
     return <div>Loading...</div>;
