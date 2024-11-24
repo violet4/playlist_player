@@ -1,7 +1,13 @@
 import os
 from contextlib import contextmanager
 import asyncio
-from typing import Optional
+from typing import Optional, Dict
+import io
+import threading
+from queue import Queue
+import time
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 from pydub import AudioSegment
 
@@ -56,6 +62,141 @@ class CurrentEpisodeRememberer:
     def current_episode(self, episode: int):
         self.set_episode_number(episode)
         self._current_episode_number = episode
+
+
+class AudioCache:
+    def __init__(self, max_episodes: int = 6):
+        self.max_episodes = max_episodes
+        self.cache: Dict[str, AudioSegment] = {}
+        self.access_times: Dict[str, float] = {}
+        self.loading_queue: Queue = Queue()
+        self.loading_threads: Dict[str, threading.Thread] = {}
+        self.lock = threading.Lock()
+        self.background_loader = threading.Thread(target=self._background_loading_worker, daemon=True)
+        self.background_loader.start()
+
+    def _background_loading_worker(self):
+        while True:
+            episode_name = self.loading_queue.get()
+            if episode_name is None:
+                break
+
+            try:
+                filepath = os.path.join("server", "episodes", f"{episode_name}.mp3")
+                audio = AudioSegment.from_mp3(filepath)
+                with self.lock:
+                    if len(self.cache) >= self.max_episodes:
+                        # Remove least recently used episode
+                        lru_episode = min(self.access_times.items(), key=lambda x: x[1])[0]
+                        del self.cache[lru_episode]
+                        del self.access_times[lru_episode]
+
+                    self.cache[episode_name] = audio
+                    self.access_times[episode_name] = time.time()
+                    if episode_name in self.loading_threads:
+                        del self.loading_threads[episode_name]
+            except Exception as e:
+                print(f"Error loading episode {episode_name}: {e}")
+
+            self.loading_queue.task_done()
+
+    def get_segment(self, episode_name: str, start_second: int, duration: int = 10) -> AudioSegment:
+        with self.lock:
+            self.access_times[episode_name] = time.time()
+            if episode_name in self.cache:
+                audio = self.cache[episode_name]
+                print("audio segment was in the cache")
+                return audio[start_second * 1000:(start_second + duration) * 1000]
+
+        # If not in cache, load directly from file
+        filepath = os.path.join("server", "episodes", f"{episode_name}.mp3")
+        segment = AudioSegment.from_file(
+            filepath,
+            format="mp3",
+            start_second=start_second,
+            duration=duration,
+        )
+        print("loaded audio segment directly from filesystem")
+
+        # Start background loading if not already loading
+        if (episode_name not in self.loading_threads and
+            episode_name not in self.cache):
+            print("queueing loading whole episode to memory")
+            self.queue_episode_loading(episode_name)
+
+        return segment
+
+    def queue_episode_loading(self, episode_name: str):
+        if (episode_name not in self.loading_threads and
+            episode_name not in self.cache):
+            self.loading_queue.put(episode_name)
+            self.loading_threads[episode_name] = threading.current_thread()
+
+    def is_episode_loaded(self, episode_name: str) -> bool:
+        return episode_name in self.cache
+
+    def clear(self):
+        with self.lock:
+            self.cache.clear()
+            self.access_times.clear()
+            self.loading_threads.clear()
+
+
+class DownloadCache:
+    def __init__(self, download_dir: str, max_concurrent_downloads: int = 2):
+        self.download_dir = download_dir
+        self.executor = ThreadPoolExecutor(max_workers=max_concurrent_downloads)
+        self.downloading: Dict[str, bool] = {}
+        self.lock = threading.Lock()
+
+    async def ensure_episode_downloaded(self, episode_url: str, filename: str) -> str:
+        filepath = os.path.join(self.download_dir, filename)
+
+        if os.path.exists(filepath):
+            return filepath
+
+        with self.lock:
+            if filename in self.downloading:
+                return filepath
+            self.downloading[filename] = True
+
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                self.executor,
+                partial(self._download_file, episode_url, filepath)
+            )
+        finally:
+            with self.lock:
+                if filename in self.downloading:
+                    del self.downloading[filename]
+
+        return filepath
+
+    def _download_file(self, url: str, filepath: str):
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(filepath, 'wb') as f:
+            f.write(response.content)
+
+
+audio_cache = AudioCache(max_episodes=3)
+download_cache = DownloadCache(
+    download_dir=os.path.join("server", "episodes"),
+    max_concurrent_downloads=2,
+)
+
+
+async def prefetch_next_episode(episode_number: int):
+    """Prefetch the next episode in the background."""
+    next_episode = episode_number + 1
+    episode_info = podcast_playlist.get_episode_info(next_episode)
+    if episode_info:
+        filename = episode_info['url'].split('/')[-1]
+        await download_cache.ensure_episode_downloaded(episode_info['url'], filename)
+        # Queue the audio loading once the file is downloaded
+        episode_name = f"sn{next_episode:04d}"
+        audio_cache.queue_episode_loading(episode_name)
 
 
 # Download episodes
@@ -115,19 +256,6 @@ app = FastAPI()
 
 
 # API Endpoints
-@app.post("/play/{episode_number}")
-def play_episode(episode_number: str, db: Session = Depends(get_db)):
-    global player, cer, playback_rate
-    episode_info = podcast_playlist.get_episode_info(int(episode_number))
-    if not episode_info:
-        raise HTTPException(status_code=404, detail="Episode not found")
-
-    filepath = download_episode(episode_info['url'])
-
-    playback_record = get_or_create_playback_record(db, episode_number)
-
-    cer.current_episode = int(episode_number)
-
 
 @app.get("/current")
 def get_current_episode(db: Session = Depends(get_db), episode_number: Optional[int] = Query(None)):
@@ -149,24 +277,6 @@ def get_current_episode(db: Session = Depends(get_db), episode_number: Optional[
 def new_current_episode(episode_number: int, db: Session = Depends(get_db)):
     cer.current_episode = episode_number
     return get_current_episode(db, episode_number)
-
-
-@app.post("/next")
-def next_episode(db: Session = Depends(get_db)):
-    if cer.current_episode:
-        next_ep_num = str(int(cer.current_episode) + 1)
-        return play_episode(next_ep_num, db)
-    else:
-        raise HTTPException(status_code=400, detail="No current episode")
-
-
-@app.post("/previous")
-def previous_episode(db: Session = Depends(get_db)):
-    if cer.current_episode:
-        prev_ep_num = str(max(1, int(cer.current_episode) - 1))
-        return play_episode(prev_ep_num, db)
-    else:
-        raise HTTPException(status_code=400, detail="No current episode")
 
 
 @app.get("/episodes")
@@ -215,36 +325,13 @@ current_episode_name: str | None = None
 SEGMENT_DURATION = 10 * 1000  # 10 seconds in milliseconds
 
 
-def load_audio_stream(episode_name: str) -> AudioSegment:
-    global current_audio, current_episode_name
-    if current_audio is None or current_episode_name != episode_name:
-        episode_path = os.path.join("server", "episodes", f"{episode_name}.mp3")
-        current_audio = AudioSegment.from_mp3(episode_path)
-        current_episode_name = episode_name
-    return current_audio
-
-
 def get_mp3_duration(filepath):
     tag = TinyTag.get(filepath)
     return tag.duration * 1000
 
-from threading import Thread
 
 @app.get("/episodes/{episode_name}.m3u8")
 async def get_playlist(episode_name: str) -> Response:
-    global current_audio
-
-    episode_path = os.path.join("server", "episodes", f"{episode_name}.mp3")
-    if not os.path.exists(episode_path):
-        episode_number = int(episode_name.lstrip('sn0'))
-        episode_info = podcast_playlist.get_episode_info(episode_number)
-        download_episode(episode_info['url'])
-        load_audio_stream(episode_name)
-    else:
-        # load audio in the background and return the m3u8 file immediately
-        thread = Thread(target=load_audio_stream, args=(episode_name,), daemon=True)
-        thread.start()
-
     filepath = os.path.join('server', 'episodes', f'{episode_name}.mp3')
     duration = int(get_mp3_duration(filepath))
     num_segments = duration // SEGMENT_DURATION + (1 if duration % SEGMENT_DURATION else 0)
@@ -254,21 +341,23 @@ async def get_playlist(episode_name: str) -> Response:
         playlist += f"#EXTINF:10.0,\n{episode_name}-{i:03d}.ts\n"
     playlist += "#EXT-X-ENDLIST"
 
+    # Trigger prefetch of next episode
+    episode_number = int(episode_name.lstrip('sn0'))
+    print('triggering download of next episode from', episode_number)
+    asyncio.create_task(prefetch_next_episode(episode_number))
+
     return Response(content=playlist, media_type="application/vnd.apple.mpegurl")
 
 
 @app.get("/episodes/{segment_name}.ts")
 async def get_segment(segment_name: str) -> Response:
-    global current_audio
     episode_name, segment_number_str = segment_name.split("-")
     segment_number = int(segment_number_str)
-    load_audio_stream(episode_name)
+    segment_begin = segment_number * 10
 
-    start_time = segment_number * SEGMENT_DURATION
-    end_time = min((segment_number + 1) * SEGMENT_DURATION, len(current_audio))
+    # Get the segment from cache or disk
+    segment: AudioSegment = audio_cache.get_segment(episode_name, segment_begin)
+    audio_buffer: io.BufferedRandom = segment.export(format="adts")
+    audio_data: bytes = audio_buffer.read()
 
-    segment = current_audio[start_time:end_time]
-
-    audio_data = segment.export(format="adts").read()
     return Response(content=audio_data, media_type="video/mp2t")
-
