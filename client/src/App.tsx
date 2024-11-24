@@ -251,7 +251,7 @@ const PodcastControls: React.FC<{
 }> = ({ episode, episodeNumber, handlePrevious, handleNext, fetchEpisodeByNumber }) => {
   const videoRef = useRef<HTMLMediaElement>(null);
   const [skipAmount, setSkipAmount] = useState(10);
-  const allowAutoplay = episode.current_time < episode.total_time;
+  const allowAutoplay = episode.current_time < episode.total_time * 60;
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
   const canPlay = useCanPlay(videoRef);
