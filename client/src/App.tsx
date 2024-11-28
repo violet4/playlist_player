@@ -229,18 +229,102 @@ const useCanPlay = (videoRef: React.RefObject<HTMLMediaElement>) => {
   return canPlay;
 };
 
+
+const useIsPlaying = (
+  videoRef: React.RefObject<HTMLMediaElement>,
+) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handlePlay = useCallback(() => setIsPlaying(true), []);
+  const handlePause = useCallback(() => setIsPlaying(false), []);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    videoRef.current.addEventListener('play', handlePlay);
+    videoRef.current.addEventListener('pause', handlePause);
+
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('play', handlePlay);
+        videoRef.current.removeEventListener('pause', handlePause);
+      }
+    };
+  }, [handlePlay, handlePause]);
+
+  return isPlaying;
+};
+
+
+const usePlaybackSettings = (
+  videoRef: React.RefObject<HTMLMediaElement>,
+  episode: Episode,
+  playbackSpeed: number,
+  isPlaying: boolean,
+) => {
+  const previousEpisodeRef = useRef(episode.episode_number);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    console.log("usePlaybackSettings useEffect");
+
+    if (previousEpisodeRef.current !== episode.episode_number && videoRef.current) {
+      console.log("previousEpisodeRef.current !== episode_number")
+      videoRef.current.playbackRate = playbackSpeed;
+
+      if (isPlaying) {
+        console.log("Was playing!");
+        // Use a small timeout to ensure the audio is ready
+        const playPromise = setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.play()
+              .catch(err => console.warn('Auto-play failed:', err));
+          }
+        }, 100);
+
+        return () => clearTimeout(playPromise);
+      }
+    }
+
+    previousEpisodeRef.current = episode.episode_number;
+
+  }, [episode.episode_number, playbackSpeed, isPlaying]);
+
+};
+
+
 const useAutoProgressToNextEpisode = (
   videoRef: React.RefObject<HTMLMediaElement>,
-  allowAutoplay: boolean,
-  episodeNumber: number,
+  episode: Episode,
   fetchEpisodeByNumber: (episodeNumber: number) => void
 ) => {
+  const allowAutoplay = episode.current_time < episode.total_time * 60;
+  console.log('allowAutoplay', allowAutoplay);
+
   useEffect(() => {
-    if (videoRef.current && allowAutoplay && videoRef.current.duration > 0 && videoRef.current.currentTime >= videoRef.current.duration) {
-      fetchEpisodeByNumber(episodeNumber + 1);
-    }
-  }, [allowAutoplay, episodeNumber, fetchEpisodeByNumber, videoRef]);
+    if (!videoRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (
+        videoRef.current &&
+        allowAutoplay &&
+        videoRef.current.duration > 0 &&
+        videoRef.current.currentTime >= videoRef.current.duration - 0.5 // Check slightly before the end
+      ) {
+        fetchEpisodeByNumber(episode.episode_number + 1);
+      }
+    };
+
+    videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      }
+    };
+  }, [allowAutoplay, episode.episode_number, fetchEpisodeByNumber]);
 };
+
 
 const PodcastControls: React.FC<{
   episode: Episode;
@@ -251,16 +335,17 @@ const PodcastControls: React.FC<{
 }> = ({ episode, episodeNumber, handlePrevious, handleNext, fetchEpisodeByNumber }) => {
   const videoRef = useRef<HTMLMediaElement>(null);
   const [skipAmount, setSkipAmount] = useState(10);
-  const allowAutoplay = episode.current_time < episode.total_time * 60;
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
   const canPlay = useCanPlay(videoRef);
+  const isPlaying = useIsPlaying(videoRef);
 
   useHlsPlayer(episode, videoRef);
   useAudioPositionUpdater(episode.episode_number, videoRef);
   useMediaSession(videoRef, episode, handlePrevious, handleNext, skipAmount);
   usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
-  useAutoProgressToNextEpisode(videoRef, allowAutoplay, episodeNumber, fetchEpisodeByNumber);
+  useAutoProgressToNextEpisode(videoRef, episode, fetchEpisodeByNumber);
+  usePlaybackSettings(videoRef, episode, playbackSpeed, isPlaying);
 
   if (episodeNumber === undefined) {
     return <div>Loading...</div>;
