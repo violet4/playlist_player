@@ -8,7 +8,30 @@
     <title>Podcast Player</title>
   </head>
   <body>
-    <div id="root"></div>
+    <noscript>
+      This page requires Javascript and the ability to run ReactJS apps!
+    </noscript>
+    <div id="root">
+      <script>
+        // Create a flag that React will clear when it loads
+        window.__REACT_NOT_LOADED = true;
+
+        // React will remove this element when it hydrates
+        const loadingElement = document.createElement('div');
+        loadingElement.id = 'react-loading-indicator';
+        loadingElement.innerHTML = 'Loading...';
+        document.getElementById('root').appendChild(loadingElement);
+
+        setTimeout(() => {
+          // Only show the error message if React hasn't loaded
+          if (window.__REACT_NOT_LOADED && document.getElementById('react-loading-indicator')) {
+            const debugDiv = document.createElement('div');
+            debugDiv.innerHTML = "If the page isn't loading, perhaps your browser doesn't support ReactJS :(";
+            document.getElementById('root').appendChild(debugDiv);
+          }
+        }, 5000);
+      </script>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

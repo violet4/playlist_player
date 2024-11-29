@@ -13,6 +13,50 @@ interface Episode {
   rate: number;
 }
 
+const originalLog = console.log;
+
+const logToScreen = (...args: any[]) => {
+  originalLog.apply(console, args);
+
+  // Create debug element if it doesn't exist
+  let debugDiv = document.getElementById('debug-log');
+  if (!debugDiv) {
+    debugDiv = document.createElement('div');
+    debugDiv.id = 'debug-log';
+    debugDiv.style.cssText = (
+      'position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); '
+      + 'color: white; padding: 10px; max-height: 200px; overflow-y: auto; '
+      + 'font-family: monospace; font-size: 12px;'
+    );
+    document.body.appendChild(debugDiv);
+  }
+
+  // Add new log entry
+  const entry = document.createElement('div');
+  entry.textContent = `${new Date().toISOString().split('T')[1].split('.')[0]} ${args.join(' ')}`;
+  debugDiv.appendChild(entry);
+
+  // Keep only last 5 entries
+  while (debugDiv.childNodes.length > 100) {
+    debugDiv.removeChild(debugDiv.firstChild);
+  }
+};
+
+// console.log = logToScreen;
+
+
+const useRemoveCantRunReactMessage = () => {
+  const didRun = useRef(false);
+  useEffect(() => {
+    console.log("removing can't run react message");
+    window.__REACT_NOT_LOADED = false;
+
+    const loadingElement = document.getElementById('react-loading-indicator');
+    if (loadingElement) {
+      loadingElement.remove();
+    }
+  }, [didRun.current]);
+};
 
 const useEpisodeData = () => {
   const [episode, setEpisode] = useState<Episode | null>(null);
@@ -124,6 +168,7 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
       }
     };
   }, [episode.episode_number]);
+  return hlsRef;
 };
 
 
@@ -195,100 +240,81 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed,
 const usePlaybackTimeRecovery = (
   playbackPosition: number|null,
   videoRef: React.RefObject<HTMLMediaElement>,
-  canPlay: boolean,
 ) => {
+  const didSetPlaybackTimeRef = useRef(false);
 
   useEffect(() => {
-    if (playbackPosition === null || !canPlay)
+    if (playbackPosition === null)
       return;
 
-    if (videoRef?.current) {
+    const recover_playback_time = () => {
+      if (!videoRef.current) return;
+      if (didSetPlaybackTimeRef.current) return;
+      didSetPlaybackTimeRef.current = true;
+      console.log("Recovering playback time");
       videoRef.current.currentTime = playbackPosition;
-    }
-  }, [playbackPosition, canPlay]);
-
-};
-
-
-const useCanPlay = (videoRef: React.RefObject<HTMLMediaElement>) => {
-  const [canPlay, setCanPlay] = useState(false);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      const handleCanPlay = () => setCanPlay(true);
-      videoRef.current.oncanplay = handleCanPlay;
-
-      return () => {
-        if (videoRef.current) {
-          videoRef.current.oncanplay = null;
-        }
-      };
-    }
-  }, [videoRef]);
-
-  return canPlay;
-};
-
-
-const useIsPlaying = (
-  videoRef: React.RefObject<HTMLMediaElement>,
-) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const handlePlay = useCallback(() => setIsPlaying(true), []);
-  const handlePause = useCallback(() => setIsPlaying(false), []);
-
-  useEffect(() => {
-    if (!videoRef.current) return;
-
-    videoRef.current.addEventListener('play', handlePlay);
-    videoRef.current.addEventListener('pause', handlePause);
-
-    return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener('play', handlePlay);
-        videoRef.current.removeEventListener('pause', handlePause);
-      }
     };
-  }, [handlePlay, handlePause]);
+    if (videoRef?.current) {
+      videoRef.current.addEventListener('play', recover_playback_time);
+      videoRef.current.addEventListener('loadeddata', recover_playback_time);
+    }
+    return () => {
+      if (videoRef?.current) {
+        videoRef.current.removeEventListener('play', recover_playback_time);
+        videoRef.current.removeEventListener('loadeddata', recover_playback_time);
+      };
+    };
+  }, [playbackPosition]);
 
-  return isPlaying;
 };
 
 
+// if it was playing, keep playing.
+// ensure the same playback rate is maintained.
 const usePlaybackSettings = (
   videoRef: React.RefObject<HTMLMediaElement>,
   episode: Episode,
   playbackSpeed: number,
-  isPlaying: boolean,
 ) => {
-  const previousEpisodeRef = useRef(episode.episode_number);
+  const wasPlaying = useRef(false);
+  const wasEpisodeNumber = useRef(episode.episode_number);
+  const didFirstPositionRestore = useRef(false);
+  // const previousEpisodeRef = useRef(episode.episode_number);
 
   useEffect(() => {
-    if (!videoRef.current) return;
-    console.log("usePlaybackSettings useEffect");
+    if (!videoRef?.current) return;
+    const setWasPlaying = () => { wasPlaying.current = true; };
+    const setWasNotPlaying = () => { wasPlaying.current = false; };
+    videoRef.current.addEventListener('play', setWasPlaying);
+    videoRef.current.addEventListener('pause', setWasNotPlaying);
 
-    if (previousEpisodeRef.current !== episode.episode_number && videoRef.current) {
-      console.log("previousEpisodeRef.current !== episode_number")
-      videoRef.current.playbackRate = playbackSpeed;
-
-      if (isPlaying) {
-        console.log("Was playing!");
-        // Use a small timeout to ensure the audio is ready
-        const playPromise = setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.play()
-              .catch(err => console.warn('Auto-play failed:', err));
-          }
-        }, 100);
-
-        return () => clearTimeout(playPromise);
+    // on play, restore playback position.
+    const restore_playback_position = () => {
+      if (videoRef.current && (!didFirstPositionRestore.current || wasEpisodeNumber.current !== episode.episode_number)) {
+        didFirstPositionRestore.current = true;
+        wasEpisodeNumber.current = episode.episode_number;
+        videoRef.current.currentTime = episode.current_time;
+        videoRef.current.playbackRate = playbackSpeed;
       }
-    }
+    };
+    const restorePlay = () => {
+      if (videoRef.current && wasPlaying.current)
+        videoRef.current.play();
+    };
+    videoRef.current.addEventListener('loadedmetadata', restorePlay);
+    videoRef.current.addEventListener('play', restore_playback_position);
 
-    previousEpisodeRef.current = episode.episode_number;
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('loadedmetadata', restorePlay);
+        videoRef.current.removeEventListener('play', restore_playback_position);
+        videoRef.current.removeEventListener('play', setWasPlaying);
+        videoRef.current.removeEventListener('pause', setWasNotPlaying);
 
-  }, [episode.episode_number, playbackSpeed, isPlaying]);
+      }
+    };
+
+  }, [episode.episode_number, playbackSpeed]);
 
 };
 
@@ -298,32 +324,177 @@ const useAutoProgressToNextEpisode = (
   episode: Episode,
   fetchEpisodeByNumber: (episodeNumber: number) => void
 ) => {
-  const allowAutoplay = episode.current_time < episode.total_time * 60;
-  console.log('allowAutoplay', allowAutoplay);
+  const allowAutoplay = Math.floor(episode.current_time) < episode.total_time * 60;
 
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const handleTimeUpdate = () => {
+    const goToNextEpisode = () => {
       if (
-        videoRef.current &&
-        allowAutoplay &&
-        videoRef.current.duration > 0 &&
-        videoRef.current.currentTime >= videoRef.current.duration - 0.5 // Check slightly before the end
+        videoRef.current
+        && allowAutoplay
+        && videoRef.current.duration > 0
       ) {
         fetchEpisodeByNumber(episode.episode_number + 1);
       }
     };
 
-    videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    videoRef.current.addEventListener('ended', goToNextEpisode);
 
     return () => {
       if (videoRef.current) {
-        videoRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        videoRef.current.removeEventListener('ended', goToNextEpisode);
       }
     };
   }, [allowAutoplay, episode.episode_number, fetchEpisodeByNumber]);
 };
+
+
+const useMediaEventLoggers = (
+  videoRef: React.RefObject<HTMLMediaElement>,
+) => {
+  const [elementNumber, setElementNumber] = useState(1);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    console.log(`Adding event listeners to videoRef number ${elementNumber}`);
+    setElementNumber(e => e + 1);
+
+    const mediaEvents = [
+      'abort',
+      'canplay',
+      'canplaythrough',
+      'durationchange',
+      'emptied',
+      'encrypted',
+      'ended',
+      'error',
+      'loadeddata',
+      'loadedmetadata',
+      'loadstart',
+      'pause',
+      'play',
+      'playing',
+      'progress',
+      'ratechange',
+      'seeked',
+      'seeking',
+      'stalled',
+      'suspend',
+      'timeupdate',
+      'volumechange',
+      'waiting',
+      'waitingforkey',
+    ] as const;
+
+    // Create array of [eventName, handler] tuples
+    const eventHandlers: Array<[string, () => void]> = mediaEvents.map(eventName => {
+      const handler = () => console.log(eventName);
+      return [eventName, handler];
+    });
+
+    // Add all event listeners
+    eventHandlers.forEach(([eventName, handler]) => {
+      videoRef.current?.addEventListener(eventName, handler);
+    });
+
+    // Cleanup function
+    return () => {
+      if (!videoRef.current) return;
+
+      eventHandlers.forEach(([eventName, handler]) => {
+        videoRef.current?.removeEventListener(eventName, handler);
+      });
+    };
+  }, [videoRef]);
+};
+
+
+interface HlsEventData {
+  [key: string]: any;  // Generic event data type since each event has different data structure
+}
+
+const useHlsEventLoggers = (
+    hlsRef: React.RefObject<Hls>,
+  ) => {
+    useEffect(() => {
+      if (!hlsRef.current) return;
+  
+      // Define all HLS events with their handlers
+      const hlsEvents: Array<[keyof typeof Hls.Events, (event: any, data: HlsEventData) => void]> = [
+        ['MEDIA_ATTACHING', (_, data) => console.log('MEDIA_ATTACHING', JSON.stringify(data))],
+        ['MEDIA_ATTACHED', (_, data) => console.log('MEDIA_ATTACHED', JSON.stringify(data))],
+        ['MEDIA_DETACHING', (_, data) => console.log('MEDIA_DETACHING', JSON.stringify(data))],
+        ['MEDIA_DETACHED', (_, data) => console.log('MEDIA_DETACHED', JSON.stringify(data))],
+        ['BUFFER_RESET', (_, data) => console.log('BUFFER_RESET', JSON.stringify(data))],
+        // ['BUFFER_CODECS', (_, data) => console.log('BUFFER_CODECS', JSON.stringify(data))],
+        ['BUFFER_CREATED', (_, data) => console.log('BUFFER_CREATED', JSON.stringify(data))],
+        // ['BUFFER_APPENDING', (_, data) => console.log('BUFFER_APPENDING', JSON.stringify(data))],
+        // ['BUFFER_APPENDED', (_, data) => console.log('BUFFER_APPENDED', JSON.stringify(data))],
+        ['BUFFER_EOS', (_, data) => console.log('BUFFER_EOS', JSON.stringify(data))],
+        ['BUFFER_FLUSHING', (_, data) => console.log('BUFFER_FLUSHING', JSON.stringify(data))],
+        ['BUFFER_FLUSHED', (_, data) => console.log('BUFFER_FLUSHED', JSON.stringify(data))],
+        ['BACK_BUFFER_REACHED', (_, data) => console.log('BACK_BUFFER_REACHED', JSON.stringify(data))],
+        ['MANIFEST_LOADING', (_, data) => console.log('MANIFEST_LOADING', JSON.stringify(data))],
+        // ['MANIFEST_LOADED', (_, data) => console.log('MANIFEST_LOADED', JSON.stringify(data))],
+        // ['MANIFEST_PARSED', (_, data) => console.log('MANIFEST_PARSED', JSON.stringify(data))],
+        ['STEERING_MANIFEST_LOADED', (_, data) => console.log('STEERING_MANIFEST_LOADED', JSON.stringify(data))],
+        // ['LEVEL_SWITCHING', (_, data) => console.log('LEVEL_SWITCHING', JSON.stringify(data))],
+        ['LEVEL_SWITCHED', (_, data) => console.log('LEVEL_SWITCHED', JSON.stringify(data))],
+        ['LEVEL_LOADING', (_, data) => console.log('LEVEL_LOADING', JSON.stringify(data))],
+        ['LEVEL_LOADED', (_, data) => console.log('LEVEL_LOADED', JSON.stringify(data))],
+        // ['LEVEL_UPDATED', (_, data) => console.log('LEVEL_UPDATED', JSON.stringify(data))],
+        // ['LEVEL_PTS_UPDATED', (_, data) => console.log('LEVEL_PTS_UPDATED', JSON.stringify(data))],
+        ['LEVELS_UPDATED', (_, data) => console.log('LEVELS_UPDATED', JSON.stringify(data))],
+        ['AUDIO_TRACKS_UPDATED', (_, data) => console.log('AUDIO_TRACKS_UPDATED', JSON.stringify(data))],
+        ['AUDIO_TRACK_SWITCHING', (_, data) => console.log('AUDIO_TRACK_SWITCHING', JSON.stringify(data))],
+        ['AUDIO_TRACK_SWITCHED', (_, data) => console.log('AUDIO_TRACK_SWITCHED', JSON.stringify(data))],
+        ['AUDIO_TRACK_LOADING', (_, data) => console.log('AUDIO_TRACK_LOADING', JSON.stringify(data))],
+        ['AUDIO_TRACK_LOADED', (_, data) => console.log('AUDIO_TRACK_LOADED', JSON.stringify(data))],
+        ['SUBTITLE_TRACKS_UPDATED', (_, data) => console.log('SUBTITLE_TRACKS_UPDATED', JSON.stringify(data))],
+        ['SUBTITLE_TRACK_SWITCH', (_, data) => console.log('SUBTITLE_TRACK_SWITCH', JSON.stringify(data))],
+        ['SUBTITLE_TRACK_LOADING', (_, data) => console.log('SUBTITLE_TRACK_LOADING', JSON.stringify(data))],
+        ['SUBTITLE_TRACK_LOADED', (_, data) => console.log('SUBTITLE_TRACK_LOADED', JSON.stringify(data))],
+        ['SUBTITLE_FRAG_PROCESSED', (_, data) => console.log('SUBTITLE_FRAG_PROCESSED', JSON.stringify(data))],
+        // ['INIT_PTS_FOUND', (_, data) => console.log('INIT_PTS_FOUND', JSON.stringify(data))],
+        ['FRAG_LOADING', (_, data) => console.log('FRAG_LOADING', JSON.stringify(data))],
+        ['FRAG_LOAD_EMERGENCY_ABORTED', (_, data) => console.log('FRAG_LOAD_EMERGENCY_ABORTED', JSON.stringify(data))],
+        // ['FRAG_LOADED', (_, data) => console.log('FRAG_LOADED', JSON.stringify(data))],
+        ['FRAG_DECRYPTED', (_, data) => console.log('FRAG_DECRYPTED', JSON.stringify(data))],
+        // ['FRAG_PARSING_INIT_SEGMENT', (_, data) => console.log('FRAG_PARSING_INIT_SEGMENT', JSON.stringify(data))],
+        ['FRAG_PARSING_USERDATA', (_, data) => console.log('FRAG_PARSING_USERDATA', JSON.stringify(data))],
+        ['FRAG_PARSING_METADATA', (_, data) => console.log('FRAG_PARSING_METADATA', JSON.stringify(data))],
+        // ['FRAG_PARSED', (_, data) => console.log('FRAG_PARSED', JSON.stringify(data))],
+        // ['FRAG_BUFFERED', (_, data) => console.log('FRAG_BUFFERED', JSON.stringify(data))],
+        // ['FRAG_CHANGED', (_, data) => console.log('FRAG_CHANGED', JSON.stringify(data))],
+        ['FPS_DROP', (_, data) => console.log('FPS_DROP', JSON.stringify(data))],
+        ['FPS_DROP_LEVEL_CAPPING', (_, data) => console.log('FPS_DROP_LEVEL_CAPPING', JSON.stringify(data))],
+        ['ERROR', (_, data) => console.log('ERROR', JSON.stringify(data))],
+        ['DESTROYING', (_, data) => console.log('DESTROYING', JSON.stringify(data))],
+        ['KEY_LOADING', (_, data) => console.log('KEY_LOADING', JSON.stringify(data))],
+        ['KEY_LOADED', (_, data) => console.log('KEY_LOADED', JSON.stringify(data))],
+        ['NON_NATIVE_TEXT_TRACKS_FOUND', (_, data) => console.log('NON_NATIVE_TEXT_TRACKS_FOUND', JSON.stringify(data))],
+        ['CUES_PARSED', (_, data) => console.log('CUES_PARSED', JSON.stringify(data))]
+      ];
+  
+      // Add all event listeners
+      hlsEvents.forEach(([event, handler]) => {
+        if (hlsRef.current)
+          hlsRef.current.on(Hls.Events[event], handler);
+      });
+  
+      // Cleanup function
+      return () => {
+        if (!hlsRef.current) return;
+        hlsEvents.forEach(([event, handler]) => {
+          if (hlsRef.current)
+            hlsRef.current.off(Hls.Events[event], handler);
+        });
+      };
+    }, [hlsRef]);
+  };
+  
 
 
 const PodcastControls: React.FC<{
@@ -337,15 +508,17 @@ const PodcastControls: React.FC<{
   const [skipAmount, setSkipAmount] = useState(10);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
-  const canPlay = useCanPlay(videoRef);
-  const isPlaying = useIsPlaying(videoRef);
+  const hlsRef = useHlsPlayer(episode, videoRef);
+  // useMediaEventLoggers(videoRef);
+  // useHlsEventLoggers(hlsRef);
 
-  useHlsPlayer(episode, videoRef);
   useAudioPositionUpdater(episode.episode_number, videoRef);
   useMediaSession(videoRef, episode, handlePrevious, handleNext, skipAmount);
-  usePlaybackTimeRecovery(episode?.current_time, videoRef, canPlay);
   useAutoProgressToNextEpisode(videoRef, episode, fetchEpisodeByNumber);
-  usePlaybackSettings(videoRef, episode, playbackSpeed, isPlaying);
+  usePlaybackSettings(videoRef, episode, playbackSpeed);
+  useRemoveCantRunReactMessage();
+
+  // usePlaybackTimeRecovery(episode?.current_time, videoRef);
 
   if (episodeNumber === undefined) {
     return <div>Loading...</div>;
@@ -354,7 +527,7 @@ const PodcastControls: React.FC<{
   const SeekBackwardsButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; }}>&lt;</button>;
   const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{ width: '5ch' }} />;
   const SeekForwardButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime += skipAmount; }}>&gt;</button>;
-  const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => fetchEpisodeByNumber(Number(e.target.value))} style={{ width: '5ch' }} />;
+  const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => fetchEpisodeByNumber(Number(e.target.value))} style={{ width: '8ch' }} />;
   const PreviousEpisodeButton = () => <button onClick={handlePrevious}>Previous</button>;
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
   const SkipSecondsWidget = () => <div><SeekBackwardsButton /><SetSkipAmountTextbox /><SeekForwardButton /></div>;
