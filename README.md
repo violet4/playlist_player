@@ -41,13 +41,17 @@ npm run dev
 
 <http://localhost:5173/>
 
-### Roadmap
+## Roadmap
 
 * Finish getting the basic audio listening capabilities super speedy and responsive
 * Refactor/minimize the code and delete all cruft to minimize bugs and potential stability issues
 * Episode Navigator
 * Ability to listen to other shows (XML-based RSS)
 * Bookmarks: ability to mark an arbitrary point in time in an episode and write a custom note, e.g. "the first time they mentioned a specific 0-day vulnerability on macOS"
+
+### Side Features
+
+* Keyboard shortcuts
 
 ## Contributing
 
