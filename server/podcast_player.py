@@ -15,7 +15,7 @@ class PodcastPlayer:
         """Extract episodes with extended information from the playlist."""
         episodes = dict()
         for segment in self.playlist.segments:
-            number_title, description = semicolons.split(segment.title)
+            number_title, description, date = semicolons.split(segment.title)
             episode_number, title = number_title.split(maxsplit=1)
             episode_number = int(episode_number)
             # Attempt to extract description if set in custom attributes (depends on parser capability)
@@ -26,6 +26,7 @@ class PodcastPlayer:
                 'url': segment.uri,
                 'file_path': self.get_filepath(episode_number),
                 'total_time': segment.duration,
+                'date': date,
             }
         return episodes
 

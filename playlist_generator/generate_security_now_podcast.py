@@ -77,16 +77,19 @@ def extract_episode_data(bs: BeautifulSoup) -> Tuple[List[Episode], List[m3u8.Se
         date = date.replace('Sept', 'Sep')
         date = date.replace('July', 'Jul')
         date = date.replace('June', 'Jun')
-        date = datetime.datetime.strptime(date, '%d %b %Y')
+        date_time = datetime.datetime.strptime(date, '%d %b %Y')
+        date = datetime.date(date_time.year, date_time.month, date_time.day)
+
+        date_str = date.strftime('%Y-%m-%d')
         title = episode_data[1].find('b').text
         if isinstance(ep_description, str):
             ep_description = ep_description.replace('\\', '')
-        title = f"{ep_num} {title};;{ep_description}"
+        title = f"{ep_num} {title};;{ep_description};;{date_str}"
 
         # episodes.append(Episode(ep_num, ep_info, ep_desc, audio_link))
         segments.append(m3u8.Segment(
             uri=audio_link, title=title, duration=duration_minutes,
-            program_date_time=date,
+            program_date_time=date_time,
         ))
 
     return episodes, segments

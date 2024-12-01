@@ -10,6 +10,7 @@ interface Episode {
   status: string;
   current_time: number;
   total_time: number;
+  date: string;
   rate: number;
 }
 
@@ -564,7 +565,7 @@ const PodcastPlayer = () => {
 
   return (
     <div>
-      <h2>#{episode.episode_number} {episode.title}</h2>
+      <h2>#{episode.episode_number} {episode.title}; {episode.date}</h2>
       <p>{episode.description}</p>
       <PodcastControls
         episode={episode}
