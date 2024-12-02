@@ -542,13 +542,13 @@ const PodcastControls: React.FC<{
         <NextEpisodeButton />
       </div>
       <br />
-      <center>
+      <div>
         <audio ref={videoRef} controls src={`/api/episodes/sn${episode.episode_number.toString().padStart(4, '0')}.m3u8`} style={{ width: '100%' }} />
         <SkipSecondsWidget />
         <PlaybackSpeedWidget playbackSpeed={playbackSpeed} setPlaybackSpeed={setPlaybackSpeed}
           updateAudioPlaybackRate={updateAudioPlaybackRate}
         />
-      </center>
+      </div>
     </div>
   );
 };
