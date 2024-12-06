@@ -52,6 +52,7 @@ npm run dev
 ### Side Features
 
 * Keyboard shortcuts
+* A survey asking (potential) users what features they are interested in: deal breakers, priority list, etc.
 
 ## Contributing
 

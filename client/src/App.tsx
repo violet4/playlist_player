@@ -49,7 +49,6 @@ const logToScreen = (...args: any[]) => {
 const useRemoveCantRunReactMessage = () => {
   const didRun = useRef(false);
   useEffect(() => {
-    console.log("removing can't run react message");
     window.__REACT_NOT_LOADED = false;
 
     const loadingElement = document.getElementById('react-loading-indicator');
@@ -210,7 +209,7 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed,
   return (
     <div>
       {/* {playbackSpeed} */}
-      Playback Speed:
+      <div>Playback Speed:</div>
       <label><input type="radio" name="speed" checked={playbackSpeed==0.5} onChange={handleSetPlaybackSpeed} />0.5</label>
       <label><input type="radio" name="speed" checked={playbackSpeed==1.0} onChange={handleSetPlaybackSpeed} />1.0</label>
       <label><input type="radio" name="speed" checked={playbackSpeed==1.25} onChange={handleSetPlaybackSpeed} />1.25</label>
@@ -421,7 +420,7 @@ const useHlsEventLoggers = (
   ) => {
     useEffect(() => {
       if (!hlsRef.current) return;
-  
+
       // Define all HLS events with their handlers
       const hlsEvents: Array<[keyof typeof Hls.Events, (event: any, data: HlsEventData) => void]> = [
         ['MEDIA_ATTACHING', (_, data) => console.log('MEDIA_ATTACHING', JSON.stringify(data))],
@@ -478,13 +477,13 @@ const useHlsEventLoggers = (
         ['NON_NATIVE_TEXT_TRACKS_FOUND', (_, data) => console.log('NON_NATIVE_TEXT_TRACKS_FOUND', JSON.stringify(data))],
         ['CUES_PARSED', (_, data) => console.log('CUES_PARSED', JSON.stringify(data))]
       ];
-  
+
       // Add all event listeners
       hlsEvents.forEach(([event, handler]) => {
         if (hlsRef.current)
           hlsRef.current.on(Hls.Events[event], handler);
       });
-  
+
       // Cleanup function
       return () => {
         if (!hlsRef.current) return;
@@ -495,7 +494,7 @@ const useHlsEventLoggers = (
       };
     }, [hlsRef]);
   };
-  
+
 
 
 const PodcastControls: React.FC<{
@@ -525,13 +524,18 @@ const PodcastControls: React.FC<{
     return <div>Loading...</div>;
   }
 
-  const SeekBackwardsButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; }}>&lt;</button>;
+  const seek_style = {width: '50px', height: '50px'};
+  const SeekBackwardsButton = () => <button
+    style={seek_style}
+    onClick={() => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; }}>&lt;</button>;
   const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{ width: '5ch' }} />;
-  const SeekForwardButton = () => <button onClick={() => { if (videoRef.current) videoRef.current.currentTime += skipAmount; }}>&gt;</button>;
+  const SeekForwardButton = () => <button
+    style={seek_style}
+    onClick={() => { if (videoRef.current) videoRef.current.currentTime += skipAmount; }}>&gt;</button>;
   const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => fetchEpisodeByNumber(Number(e.target.value))} style={{ width: '8ch' }} />;
   const PreviousEpisodeButton = () => <button onClick={handlePrevious}>Previous</button>;
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
-  const SkipSecondsWidget = () => <div><SeekBackwardsButton /><SetSkipAmountTextbox /><SeekForwardButton /></div>;
+  const SkipSecondsWidget = () => <div><SeekBackwardsButton /><SeekForwardButton /><SetSkipAmountTextbox /></div>;
   const updateAudioPlaybackRate = (r: number) => {if (videoRef?.current) videoRef.current.playbackRate = r};
 
   return (
