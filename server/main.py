@@ -333,6 +333,10 @@ def get_mp3_duration(filepath):
 @app.get("/episodes/{episode_name}.m3u8")
 async def get_playlist(episode_name: str) -> Response:
     filepath = os.path.join('server', 'episodes', f'{episode_name}.mp3')
+    episode_number = int(episode_name.lstrip('sn0'))
+    if not os.path.exists(filepath):
+        await prefetch_next_episode(episode_number-1)
+
     duration = int(get_mp3_duration(filepath))
     num_segments = duration // SEGMENT_DURATION + (1 if duration % SEGMENT_DURATION else 0)
 
@@ -342,7 +346,6 @@ async def get_playlist(episode_name: str) -> Response:
     playlist += "#EXT-X-ENDLIST"
 
     # Trigger prefetch of next episode
-    episode_number = int(episode_name.lstrip('sn0'))
     print('triggering download of next episode from', episode_number)
     asyncio.create_task(prefetch_next_episode(episode_number))
 
