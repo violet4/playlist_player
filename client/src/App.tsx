@@ -505,7 +505,7 @@ const PodcastControls: React.FC<{
   fetchEpisodeByNumber: (episodeNumber: number) => void;
 }> = ({ episode, episodeNumber, handlePrevious, handleNext, fetchEpisodeByNumber }) => {
   const videoRef = useRef<HTMLMediaElement>(null);
-  const [skipAmount, setSkipAmount] = useState(10);
+  const [skipAmount, setSkipAmount] = useState(5);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
   const hlsRef = useHlsPlayer(episode, videoRef);
@@ -525,17 +525,41 @@ const PodcastControls: React.FC<{
   }
 
   const seek_style = {width: '50px', height: '50px'};
-  const SeekBackwardsButton = () => <button
+  const SeekButton = ({direction, seconds}: {direction: "forward"|"backward", seconds: number}) => <button
     style={seek_style}
-    onClick={() => { if (videoRef.current) videoRef.current.currentTime -= skipAmount; }}>&lt;</button>;
+    onClick={() => { if (videoRef.current) videoRef.current.currentTime += (Number(direction=='forward')*2-1) * seconds; }}>
+      {direction=='backward' && '<'}
+      {seconds}
+      {direction=='forward' && '>'}
+  </button>;
+
+  const SeekForwardButton = ({seconds}: {seconds: number}) => <SeekButton direction={'forward'} seconds={seconds} />;
+  const SeekBackwardButton = ({seconds}: {seconds: number}) => <SeekButton direction={'backward'} seconds={seconds} />;
+
+  const SeekForward10Sec = () => <SeekForwardButton seconds={10} />;
+  const SeekForward20Sec = () => <SeekForwardButton seconds={20} />;
+  const SeekForward30Sec = () => <SeekForwardButton seconds={30} />;
+  const SeekForwardButtonSkipAmount = () => <SeekForwardButton seconds={skipAmount} />;
+
+  const SeekBackward10Sec = () => <SeekBackwardButton seconds={10} />;
+  const SeekBackward20Sec = () => <SeekBackwardButton seconds={20} />;
+  const SeekBackward30Sec = () => <SeekBackwardButton seconds={30} />;
+  const SeekBackwardButtonSkipAmount = () => <SeekBackwardButton seconds={skipAmount} />;
+
+
   const SetSkipAmountTextbox = () => <input type="number" value={skipAmount} onChange={(e) => setSkipAmount(Number(e.target.value))} style={{ width: '5ch' }} />;
-  const SeekForwardButton = () => <button
-    style={seek_style}
-    onClick={() => { if (videoRef.current) videoRef.current.currentTime += skipAmount; }}>&gt;</button>;
   const EpisodeNumberTextbox = () => <input type="number" value={episodeNumber} onChange={(e) => fetchEpisodeByNumber(Number(e.target.value))} style={{ width: '8ch' }} />;
   const PreviousEpisodeButton = () => <button onClick={handlePrevious}>Previous</button>;
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
-  const SkipSecondsWidget = () => <div><SeekBackwardsButton /><SeekForwardButton /><SetSkipAmountTextbox /></div>;
+  const SkipSecondsWidget = () => <div>
+
+    <SeekBackward30Sec /><SeekBackward20Sec /><SeekBackward10Sec />
+    <SeekForward10Sec /><SeekForward20Sec /><SeekForward30Sec />
+    <br/>
+
+    <SeekBackwardButtonSkipAmount /><SeekForwardButtonSkipAmount />
+    <SetSkipAmountTextbox />
+  </div>;
   const updateAudioPlaybackRate = (r: number) => {if (videoRef?.current) videoRef.current.playbackRate = r};
 
   return (
