@@ -232,6 +232,42 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
   const [customPlaybackSpeed, setCustomPlaybackSpeed] = useState<number>(1.0);
   const [isCustomSelected, setIsCustomSelected] = useState<boolean>(false);
 
+  useEffect(() => {
+    const fetchPlaybackSpeed = async () => {
+      try {
+        const response = await fetch('/api/playback_speed');
+        if (!response.ok) {
+          throw new Error('Failed to fetch playback speed');
+        }
+
+        const speedText = await response.text(); // Get the response as plain text
+        const speed = parseFloat(speedText); // Convert the text to a float
+        if (isNaN(speed)) {
+          throw new Error('Invalid playback speed value from server');
+        }
+
+        const predefinedSpeeds = [0.5, 1.0, 1.25, 1.5, 2.0];
+        if (predefinedSpeeds.includes(speed)) {
+          setPlaybackSpeed(speed);
+          updateAudioPlaybackRate(speed);
+          setIsCustomSelected(false);
+        } else {
+          setCustomPlaybackSpeed(speed);
+          setPlaybackSpeed(speed);
+          updateAudioPlaybackRate(speed);
+          setIsCustomSelected(true);
+        }
+      } catch (error) {
+        console.error('Error fetching playback speed:', error);
+        setPlaybackSpeed(1.0);
+        updateAudioPlaybackRate(1.0);
+        setIsCustomSelected(false);
+      }
+    };
+
+    fetchPlaybackSpeed();
+  }, []);
+
   const handleSetPlaybackSpeed = (newSpeed: number) => {
     setPlaybackSpeed(newSpeed);
     updateAudioPlaybackRate(newSpeed);
