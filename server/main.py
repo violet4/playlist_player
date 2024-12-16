@@ -364,3 +364,21 @@ async def get_segment(segment_name: str) -> Response:
     audio_data: bytes = audio_buffer.read()
 
     return Response(content=audio_data, media_type="video/mp2t")
+
+
+@app.put("/playback_speed")
+async def save_playback_speed(speed: float) -> float:
+    with open('playback_speed.txt', 'w') as fw:
+        fw.write(str(speed))
+    return speed
+
+@app.get("/playback_speed")
+async def get_playback_speed() -> float:
+    try:
+        with open('playback_speed.txt', 'r') as fr:
+            speed = float(fr.read().strip())
+    except FileNotFoundError:
+        speed = 1.0
+    return speed
+
+

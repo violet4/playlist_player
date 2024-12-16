@@ -199,34 +199,101 @@ interface PlaybackSpeedWidgetProps {
 }
 
 
-const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({playbackSpeed, setPlaybackSpeed, updateAudioPlaybackRate}) => {
+const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
+  playbackSpeed,
+  setPlaybackSpeed,
+  updateAudioPlaybackRate,
+}) => {
   const [customPlaybackSpeed, setCustomPlaybackSpeed] = useState<number>(1.0);
-  const handleSetPlaybackSpeed = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPlaybackSpeed = Number(e.target.parentNode?.textContent);
-    setPlaybackSpeed(newPlaybackSpeed);
-    updateAudioPlaybackRate(newPlaybackSpeed);
+
+  const handleSetPlaybackSpeed = (newSpeed: number) => {
+    setPlaybackSpeed(newSpeed);
+    updateAudioPlaybackRate(newSpeed);
+
+    // Send the new speed to the backend
+    fetch(`/api/playback_speed?speed=${newSpeed}`, { method: 'PUT' })
+      .then((resp) => {
+        if (!resp.ok) {
+          console.error('Failed to update playback speed on the server');
+        }
+      })
+      .catch((error) => {
+        console.error('Error updating playback speed on the server:', error);
+      });
   };
+
+  const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPlaybackSpeed = Number(e.target.parentNode?.textContent);
+    handleSetPlaybackSpeed(newPlaybackSpeed);
+  };
+
   return (
     <div>
-      {/* {playbackSpeed} */}
       <div>Playback Speed:</div>
-      <label><input type="radio" name="speed" checked={playbackSpeed==0.5} onChange={handleSetPlaybackSpeed} />0.5</label>
-      <label><input type="radio" name="speed" checked={playbackSpeed==1.0} onChange={handleSetPlaybackSpeed} />1.0</label>
-      <label><input type="radio" name="speed" checked={playbackSpeed==1.25} onChange={handleSetPlaybackSpeed} />1.25</label>
-      <label><input type="radio" name="speed" checked={playbackSpeed==1.5} onChange={handleSetPlaybackSpeed} />1.5</label>
-      <label><input type="radio" name="speed" checked={playbackSpeed==2.0} onChange={handleSetPlaybackSpeed} />2.0</label>
       <label>
-        {/* custom playback speed */}
-        <input type="radio" name="speed" checked={playbackSpeed==customPlaybackSpeed} onChange={() => {
-          updateAudioPlaybackRate(customPlaybackSpeed);
-          setPlaybackSpeed(customPlaybackSpeed);
-        }} />
-        <input type="number" step={0.5} value={customPlaybackSpeed} style={{width: '6ch'}}
+        <input
+          type="radio"
+          name="speed"
+          checked={playbackSpeed === 0.5}
+          onChange={handleRadioChange}
+        />
+        0.5
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="speed"
+          checked={playbackSpeed === 1.0}
+          onChange={handleRadioChange}
+        />
+        1.0
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="speed"
+          checked={playbackSpeed === 1.25}
+          onChange={handleRadioChange}
+        />
+        1.25
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="speed"
+          checked={playbackSpeed === 1.5}
+          onChange={handleRadioChange}
+        />
+        1.5
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="speed"
+          checked={playbackSpeed === 2.0}
+          onChange={handleRadioChange}
+        />
+        2.0
+      </label>
+      <label>
+        {/* Custom playback speed */}
+        <input
+          type="radio"
+          name="speed"
+          checked={playbackSpeed === customPlaybackSpeed}
+          onChange={() => {
+            handleSetPlaybackSpeed(customPlaybackSpeed);
+          }}
+        />
+        <input
+          type="number"
+          step={0.5}
+          value={customPlaybackSpeed}
+          style={{ width: '6ch' }}
           onChange={(e) => {
             const newCustomPlaybackSpeed = Number(e.target.value);
-            if (customPlaybackSpeed == playbackSpeed) {
-              setPlaybackSpeed(newCustomPlaybackSpeed);
-              updateAudioPlaybackRate(newCustomPlaybackSpeed);
+            if (customPlaybackSpeed === playbackSpeed) {
+              handleSetPlaybackSpeed(newCustomPlaybackSpeed);
             }
             setCustomPlaybackSpeed(newCustomPlaybackSpeed);
           }}
