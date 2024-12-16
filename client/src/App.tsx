@@ -191,6 +191,31 @@ const useAudioPositionUpdater = (episodeNumber: number, videoRef: React.RefObjec
   }, [episodeNumber]);
 };
 
+interface PlaybackSpeedRadioButtonProps {
+  speed: number;
+  playbackSpeed: number;
+  isCustomSelected: boolean;
+  onSelect: (speed: number) => void;
+}
+
+const PlaybackSpeedRadioButton: React.FC<PlaybackSpeedRadioButtonProps> = ({
+  speed,
+  playbackSpeed,
+  isCustomSelected,
+  onSelect,
+}) => {
+  return (
+    <label>
+      <input
+        type="radio"
+        name="speed"
+        checked={!isCustomSelected && playbackSpeed === speed}
+        onChange={() => onSelect(speed)}
+      />
+      {speed}
+    </label>
+  );
+};
 
 interface PlaybackSpeedWidgetProps {
   playbackSpeed: number;
@@ -241,58 +266,25 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
   return (
     <div>
       <div>Playback Speed:</div>
-      <label>
-        <input
-          type="radio"
-          name="speed"
-          checked={!isCustomSelected && playbackSpeed === 0.5}
-          onChange={() => handlePresetRadioSelection(0.5)}
+      {/* Render pre-set playback speed buttons */}
+      {[0.5, 1.0, 1.25, 1.5, 2.0].map((speed) => (
+        <PlaybackSpeedRadioButton
+          key={speed}
+          speed={speed}
+          playbackSpeed={playbackSpeed}
+          isCustomSelected={isCustomSelected}
+          onSelect={handlePresetRadioSelection}
         />
-        0.5
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="speed"
-          checked={!isCustomSelected && playbackSpeed === 1.0}
-          onChange={() => handlePresetRadioSelection(1.0)}
-        />
-        1.0
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="speed"
-          checked={!isCustomSelected && playbackSpeed === 1.25}
-          onChange={() => handlePresetRadioSelection(1.25)}
-        />
-        1.25
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="speed"
-          checked={!isCustomSelected && playbackSpeed === 1.5}
-          onChange={() => handlePresetRadioSelection(1.5)}
-        />
-        1.5
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="speed"
-          checked={!isCustomSelected && playbackSpeed === 2.0}
-          onChange={() => handlePresetRadioSelection(2.0)}
-        />
-        2.0
-      </label>
+      ))}
+
+      {/* Custom playback speed */}
       <label>
         <input
           type="radio"
           name="speed"
           checked={isCustomSelected}
           onChange={() => {
-            setIsCustomSelected(true); // Select custom radio button
+            setIsCustomSelected(true);
             handleSetPlaybackSpeed(customPlaybackSpeed);
           }}
         />
