@@ -205,6 +205,7 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
   updateAudioPlaybackRate,
 }) => {
   const [customPlaybackSpeed, setCustomPlaybackSpeed] = useState<number>(1.0);
+  const [isCustomSelected, setIsCustomSelected] = useState<boolean>(false);
 
   const handleSetPlaybackSpeed = (newSpeed: number) => {
     setPlaybackSpeed(newSpeed);
@@ -222,9 +223,19 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
       });
   };
 
-  const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPlaybackSpeed = Number(e.target.parentNode?.textContent);
-    handleSetPlaybackSpeed(newPlaybackSpeed);
+  const handlePresetRadioSelection = (newSpeed: number) => {
+    setIsCustomSelected(false);
+    handleSetPlaybackSpeed(newSpeed);
+  };
+
+  const handleCustomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCustomPlaybackSpeed = Number(e.target.value);
+    setCustomPlaybackSpeed(newCustomPlaybackSpeed);
+
+    // If the custom radio button is selected, update the playback speed
+    if (isCustomSelected) {
+      handleSetPlaybackSpeed(newCustomPlaybackSpeed);
+    }
   };
 
   return (
@@ -234,8 +245,8 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
         <input
           type="radio"
           name="speed"
-          checked={playbackSpeed === 0.5}
-          onChange={handleRadioChange}
+          checked={!isCustomSelected && playbackSpeed === 0.5}
+          onChange={() => handlePresetRadioSelection(0.5)}
         />
         0.5
       </label>
@@ -243,8 +254,8 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
         <input
           type="radio"
           name="speed"
-          checked={playbackSpeed === 1.0}
-          onChange={handleRadioChange}
+          checked={!isCustomSelected && playbackSpeed === 1.0}
+          onChange={() => handlePresetRadioSelection(1.0)}
         />
         1.0
       </label>
@@ -252,8 +263,8 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
         <input
           type="radio"
           name="speed"
-          checked={playbackSpeed === 1.25}
-          onChange={handleRadioChange}
+          checked={!isCustomSelected && playbackSpeed === 1.25}
+          onChange={() => handlePresetRadioSelection(1.25)}
         />
         1.25
       </label>
@@ -261,8 +272,8 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
         <input
           type="radio"
           name="speed"
-          checked={playbackSpeed === 1.5}
-          onChange={handleRadioChange}
+          checked={!isCustomSelected && playbackSpeed === 1.5}
+          onChange={() => handlePresetRadioSelection(1.5)}
         />
         1.5
       </label>
@@ -270,18 +281,18 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
         <input
           type="radio"
           name="speed"
-          checked={playbackSpeed === 2.0}
-          onChange={handleRadioChange}
+          checked={!isCustomSelected && playbackSpeed === 2.0}
+          onChange={() => handlePresetRadioSelection(2.0)}
         />
         2.0
       </label>
       <label>
-        {/* Custom playback speed */}
         <input
           type="radio"
           name="speed"
-          checked={playbackSpeed === customPlaybackSpeed}
+          checked={isCustomSelected}
           onChange={() => {
+            setIsCustomSelected(true); // Select custom radio button
             handleSetPlaybackSpeed(customPlaybackSpeed);
           }}
         />
@@ -290,13 +301,7 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
           step={0.5}
           value={customPlaybackSpeed}
           style={{ width: '6ch' }}
-          onChange={(e) => {
-            const newCustomPlaybackSpeed = Number(e.target.value);
-            if (customPlaybackSpeed === playbackSpeed) {
-              handleSetPlaybackSpeed(newCustomPlaybackSpeed);
-            }
-            setCustomPlaybackSpeed(newCustomPlaybackSpeed);
-          }}
+          onChange={handleCustomChange}
         />
       </label>
     </div>
