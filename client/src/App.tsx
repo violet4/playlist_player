@@ -168,7 +168,6 @@ const useHlsPlayer = (episode: Episode, videoRef: React.RefObject<HTMLMediaEleme
       }
     };
   }, [episode.episode_number]);
-  return hlsRef;
 };
 
 
@@ -476,7 +475,7 @@ const PodcastControls: React.FC<{
   const [skipAmount, setSkipAmount] = useState(5);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
-  // const hlsRef = useHlsPlayer(episode, videoRef);
+  useHlsPlayer(episode, videoRef);
   // useMediaEventLoggers(videoRef);
   // useHlsEventLoggers(hlsRef);
 
