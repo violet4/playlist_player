@@ -1,7 +1,7 @@
 import os
 from contextlib import contextmanager
 import asyncio
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import io
 import threading
 from queue import Queue
@@ -17,6 +17,7 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Mapped, Session
 from sqlalchemy.exc import NoResultFound
 from tinytag import TinyTag
+from pydantic import BaseModel
 
 from .podcast_player import PodcastPlayer
 
@@ -279,12 +280,6 @@ def new_current_episode(episode_number: int, db: Session = Depends(get_db)):
     return get_current_episode(db, episode_number)
 
 
-@app.get("/episodes")
-def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100)):
-    episodes = podcast_playlist.list_episodes(page=page, per_page=per_page)
-    return episodes
-
-
 @app.put("/audio_position/{episode_number}/{playback_position}")
 def update_playback_position(episode_number: int, playback_position: int, db: Session = Depends(get_db)):
     db_rec = get_or_create_playback_record(db, episode_number)
@@ -382,3 +377,53 @@ async def get_playback_speed() -> float:
     return speed
 
 
+class Episode(BaseModel):
+    id: int
+    title: str
+    description: str
+    duration: float
+    publishDate: str
+
+class EpisodeListResponse(BaseModel):
+    episodes: List[Episode]
+    total: int
+
+
+# @app.get("/episodes")
+# def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100)):
+#     episodes = podcast_playlist.list_episodes(page=page, per_page=per_page)
+#     return episodes
+
+
+@app.get("/episodes", response_model=EpisodeListResponse)
+async def get_episodes(
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    direction: str = Query(default="desc", regex="^(asc|desc)$")
+):
+    # Get total episodes count
+    total_episodes = podcast_playlist.get_total_episodes()
+
+    # Calculate episode range
+    start_episode = offset + 1
+    end_episode = min(start_episode + limit, total_episodes)
+
+    # Get episode info for range
+    episodes = []
+    for num in range(start_episode, end_episode + 1):
+        info = podcast_playlist.get_episode_info(num)
+        episodes.append(Episode(
+            id=info['number'],
+            title=info['title'],
+            description=info['description'],
+            duration=info['total_time'],
+            publishDate=info['date']
+        ))
+
+    if direction == "desc":
+        episodes.reverse()
+
+    return EpisodeListResponse(
+        episodes=episodes,
+        total=total_episodes
+    )

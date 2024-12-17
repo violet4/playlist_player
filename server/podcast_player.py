@@ -53,6 +53,9 @@ class PodcastPlayer:
             'file_path': self.get_filepath(episode_number),
         }
 
+    def get_total_episodes(self):
+        return len(self.episodes)
+
 m3u_content = """
 #EXTM3U
 #EXTINF:-1, 1 - Episode #1 | 19 Aug 2005 | As the Worm Turns
