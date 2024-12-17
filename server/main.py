@@ -410,7 +410,7 @@ async def get_episodes(
 
     # Get episode info for range
     episodes = []
-    for num in range(start_episode, end_episode + 1):
+    for num in range(start_episode, end_episode):
         info = podcast_playlist.get_episode_info(num)
         episodes.append(Episode(
             id=info['number'],

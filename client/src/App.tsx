@@ -570,6 +570,7 @@ const PodcastPlayer = () => {
         handleNext={handleNext}
         fetchEpisodeByNumber={fetchEpisodeByNumber}
       />
+      <EpisodeList />
     </div>
   );
 };
@@ -582,6 +583,57 @@ function App() {
     </>
   );
 }
+
+
+interface Episode {
+  id: number;
+  title: string;
+  description: string;
+  duration: number;
+  publishDate: string;
+}
+
+interface EpisodeListResponse {
+  episodes: Episode[];
+  total: number;
+}
+
+const EpisodeList: React.FC = () => {
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+
+  useEffect(() => {
+    const fetchEpisodes = async () => {
+      try {
+        const response = await fetch('/api/episodes?limit=50&offset=50&direction=asc');
+        if (!response.ok) {
+          throw new Error('Failed to fetch episodes');
+        }
+        const data: EpisodeListResponse = await response.json();
+        setEpisodes(data.episodes);
+      } catch (error) {
+        console.error('Error fetching episodes:', error);
+      }
+    };
+
+    fetchEpisodes();
+  }, []);
+
+  return (
+    <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px', border: '1px solid #ccc' }}>
+      {episodes.map((episode) => (
+        <div key={episode.id} style={{ marginBottom: '20px' }}>
+          <h3>{episode.title}</h3>
+          <p>{episode.description}</p>
+          <p>Duration: {episode.duration} minutes</p>
+          <p>Published: {episode.publishDate}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+
+
 
 export default App;
 
