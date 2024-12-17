@@ -217,18 +217,11 @@ const PlaybackSpeedRadioButton: React.FC<PlaybackSpeedRadioButtonProps> = ({
   );
 };
 
-interface PlaybackSpeedWidgetProps {
-  playbackSpeed: number;
-  setPlaybackSpeed: (speed: number) => void;
-  updateAudioPlaybackRate: (rate: number) => void;
-}
 
-
-const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
-  playbackSpeed,
-  setPlaybackSpeed,
-  updateAudioPlaybackRate,
-}) => {
+const useSavedPlaybackSpeed = (
+  setPlaybackSpeed: (speed: number) => void,
+  updateAudioPlaybackRate: (rate: number) => void
+) => {
   const [customPlaybackSpeed, setCustomPlaybackSpeed] = useState<number>(1.0);
   const [isCustomSelected, setIsCustomSelected] = useState<boolean>(false);
 
@@ -267,6 +260,29 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
 
     fetchPlaybackSpeed();
   }, []);
+
+  return { customPlaybackSpeed, setCustomPlaybackSpeed, isCustomSelected, setIsCustomSelected };
+};
+
+
+interface PlaybackSpeedWidgetProps {
+  playbackSpeed: number;
+  setPlaybackSpeed: (speed: number) => void;
+  updateAudioPlaybackRate: (rate: number) => void;
+}
+
+
+const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
+  playbackSpeed,
+  setPlaybackSpeed,
+  updateAudioPlaybackRate,
+}) => {
+  const {
+    customPlaybackSpeed,
+    setCustomPlaybackSpeed,
+    isCustomSelected,
+    setIsCustomSelected,
+  } = useSavedPlaybackSpeed(setPlaybackSpeed, updateAudioPlaybackRate);
 
   const handleSetPlaybackSpeed = (newSpeed: number) => {
     setPlaybackSpeed(newSpeed);
