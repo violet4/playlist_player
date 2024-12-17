@@ -47,7 +47,8 @@ npm run dev
 * Refactor/minimize the code and delete all cruft to minimize bugs and potential stability issues
 * Episode Navigator
 * Ability to listen to other shows (XML-based RSS)
-* Bookmarks: ability to mark an arbitrary point in time in an episode and write a custom note, e.g. "the first time they mentioned a specific 0-day vulnerability on macOS"
+* Bookmarks: ability to mark an arbitrary point in time in an episode and write a custom note, e.g. "the first time they mentioned a specific 0-day vulnerability on macOS". The desire is to be able to add notes to arbitrary points in time within an episode, but we will start with per-episode notes. The user can manually type in points in time of the episode into the note such as "5:32".
+* Search/Filter episode navigator by title, description, custom notes
 
 ### Side Features
 
