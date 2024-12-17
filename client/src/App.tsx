@@ -598,11 +598,45 @@ interface EpisodeListResponse {
   total: number;
 }
 
-const EpisodeList: React.FC = () => {
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
+
+interface PaginationResult {
+  currentOffset: number;
+  episodesPerPage: number;
+  handleEpisodesPerPageChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  handlePreviousPage: () => void;
+  handleNextPage: () => void;
+}
+
+const usePagination = (totalEpisodes: number): PaginationResult => {
   const [episodesPerPage, setEpisodesPerPage] = useState<number>(10);
   const [currentOffset, setCurrentOffset] = useState<number>(0);
-  const [totalEpisodes, setTotalEpisodes] = useState<number>(0);
+
+  const handleEpisodesPerPageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newEpisodesPerPage = Number(event.target.value);
+    setEpisodesPerPage(newEpisodesPerPage);
+    setCurrentOffset((prevOffset) => prevOffset - (prevOffset % newEpisodesPerPage));
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentOffset((prevOffset) => Math.max(prevOffset - episodesPerPage, 0));
+  };
+
+  const handleNextPage = () => {
+    setCurrentOffset((prevOffset) => Math.min(prevOffset + episodesPerPage, totalEpisodes - episodesPerPage));
+  };
+
+  return {
+    currentOffset,
+    episodesPerPage,
+    handleEpisodesPerPageChange,
+    handlePreviousPage,
+    handleNextPage,
+  };
+};
+
+
+const useFetchEpisodes = (episodesPerPage: number, currentOffset: number, setTotalEpisodes: (n: number) => void) => {
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
 
   useEffect(() => {
     const fetchEpisodes = async () => {
@@ -622,36 +656,38 @@ const EpisodeList: React.FC = () => {
     fetchEpisodes();
   }, [episodesPerPage, currentOffset]);
 
-  const handleEpisodesPerPageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const episodes_per_page = Number(event.target.value);
-    setEpisodesPerPage(episodes_per_page);
-    setCurrentOffset(currentOffset - (currentOffset % episodes_per_page));
-  };
+  return episodes;
+};
 
-  const handlePreviousPage = () => {
-    setCurrentOffset((prevOffset: number) => Math.max(prevOffset - episodesPerPage, 0));
-  };
 
-  const handleNextPage = () => {
-    setCurrentOffset((prevOffset: number) => Math.min(prevOffset + episodesPerPage, totalEpisodes - episodesPerPage));
-  };
+const EpisodeList: React.FC = () => {
+  const [totalEpisodes, setTotalEpisodes] = useState<number>(0);
+  const {
+    currentOffset,
+    episodesPerPage,
+    handleEpisodesPerPageChange,
+    handlePreviousPage,
+    handleNextPage,
+  } = usePagination(totalEpisodes);
 
-  const startEpisode = currentOffset + 1;
-  const endEpisode = Math.min(currentOffset + episodesPerPage, totalEpisodes);
+  const episodes = useFetchEpisodes(episodesPerPage, currentOffset, setTotalEpisodes);
+
+  const startIndex = currentOffset + 1;
+  const endIndex = Math.min(currentOffset + episodesPerPage, totalEpisodes);
 
   return (
     <div>
       <div style={{ marginBottom: '20px' }}>
         <label htmlFor="episodesPerPage">Episodes per page:</label>
         <select id="episodesPerPage" value={episodesPerPage} onChange={handleEpisodesPerPageChange}>
-          {[10, 25, 50, 100, 250].map((v) => <option value={v}>{v}</option>)}
+          {[10, 25, 50, 100, 250].map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       </div>
       <div style={{ marginBottom: '20px' }}>
         <button onClick={handlePreviousPage} disabled={currentOffset === 0}>Previous</button>
-        <button onClick={handleNextPage} disabled={endEpisode >= totalEpisodes}>Next</button>
+        <button onClick={handleNextPage} disabled={endIndex >= totalEpisodes}>Next</button>
         <span style={{ margin: '0 10px' }}>
-          {startEpisode}-{endEpisode} of {totalEpisodes}
+          {startIndex}-{endIndex} of {totalEpisodes}
         </span>
       </div>
       <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px', border: '1px solid #ccc' }}>
