@@ -233,8 +233,8 @@ const useSavedPlaybackSpeed = (
           throw new Error('Failed to fetch playback speed');
         }
 
-        const speedText = await response.text(); // Get the response as plain text
-        const speed = parseFloat(speedText); // Convert the text to a float
+        const speedText = await response.text();
+        const speed = parseFloat(speedText);
         if (isNaN(speed)) {
           throw new Error('Invalid playback speed value from server');
         }
@@ -288,7 +288,6 @@ const PlaybackSpeedWidget: React.FC<PlaybackSpeedWidgetProps> = ({
     setPlaybackSpeed(newSpeed);
     updateAudioPlaybackRate(newSpeed);
 
-    // Send the new speed to the backend
     fetch(`/api/playback_speed?speed=${newSpeed}`, { method: 'PUT' })
       .then((resp) => {
         if (!resp.ok) {
@@ -466,153 +465,6 @@ const useAutoProgressToNextEpisode = (
 };
 
 
-const useMediaEventLoggers = (
-  videoRef: React.RefObject<HTMLMediaElement>,
-) => {
-  const [elementNumber, setElementNumber] = useState(1);
-
-  useEffect(() => {
-    if (!videoRef.current) return;
-
-    console.log(`Adding event listeners to videoRef number ${elementNumber}`);
-    setElementNumber(e => e + 1);
-
-    const mediaEvents = [
-      'abort',
-      'canplay',
-      'canplaythrough',
-      'durationchange',
-      'emptied',
-      'encrypted',
-      'ended',
-      'error',
-      'loadeddata',
-      'loadedmetadata',
-      'loadstart',
-      'pause',
-      'play',
-      'playing',
-      'progress',
-      'ratechange',
-      'seeked',
-      'seeking',
-      'stalled',
-      'suspend',
-      'timeupdate',
-      'volumechange',
-      'waiting',
-      'waitingforkey',
-    ] as const;
-
-    // Create array of [eventName, handler] tuples
-    const eventHandlers: Array<[string, () => void]> = mediaEvents.map(eventName => {
-      const handler = () => console.log(eventName);
-      return [eventName, handler];
-    });
-
-    // Add all event listeners
-    eventHandlers.forEach(([eventName, handler]) => {
-      videoRef.current?.addEventListener(eventName, handler);
-    });
-
-    // Cleanup function
-    return () => {
-      if (!videoRef.current) return;
-
-      eventHandlers.forEach(([eventName, handler]) => {
-        videoRef.current?.removeEventListener(eventName, handler);
-      });
-    };
-  }, [videoRef]);
-};
-
-
-interface HlsEventData {
-  [key: string]: any;  // Generic event data type since each event has different data structure
-}
-
-const useHlsEventLoggers = (
-    hlsRef: React.RefObject<Hls>,
-  ) => {
-    useEffect(() => {
-      if (!hlsRef.current) return;
-
-      // Define all HLS events with their handlers
-      const hlsEvents: Array<[keyof typeof Hls.Events, (event: any, data: HlsEventData) => void]> = [
-        ['MEDIA_ATTACHING', (_, data) => console.log('MEDIA_ATTACHING', JSON.stringify(data))],
-        ['MEDIA_ATTACHED', (_, data) => console.log('MEDIA_ATTACHED', JSON.stringify(data))],
-        ['MEDIA_DETACHING', (_, data) => console.log('MEDIA_DETACHING', JSON.stringify(data))],
-        ['MEDIA_DETACHED', (_, data) => console.log('MEDIA_DETACHED', JSON.stringify(data))],
-        ['BUFFER_RESET', (_, data) => console.log('BUFFER_RESET', JSON.stringify(data))],
-        // ['BUFFER_CODECS', (_, data) => console.log('BUFFER_CODECS', JSON.stringify(data))],
-        ['BUFFER_CREATED', (_, data) => console.log('BUFFER_CREATED', JSON.stringify(data))],
-        // ['BUFFER_APPENDING', (_, data) => console.log('BUFFER_APPENDING', JSON.stringify(data))],
-        // ['BUFFER_APPENDED', (_, data) => console.log('BUFFER_APPENDED', JSON.stringify(data))],
-        ['BUFFER_EOS', (_, data) => console.log('BUFFER_EOS', JSON.stringify(data))],
-        ['BUFFER_FLUSHING', (_, data) => console.log('BUFFER_FLUSHING', JSON.stringify(data))],
-        ['BUFFER_FLUSHED', (_, data) => console.log('BUFFER_FLUSHED', JSON.stringify(data))],
-        ['BACK_BUFFER_REACHED', (_, data) => console.log('BACK_BUFFER_REACHED', JSON.stringify(data))],
-        ['MANIFEST_LOADING', (_, data) => console.log('MANIFEST_LOADING', JSON.stringify(data))],
-        // ['MANIFEST_LOADED', (_, data) => console.log('MANIFEST_LOADED', JSON.stringify(data))],
-        // ['MANIFEST_PARSED', (_, data) => console.log('MANIFEST_PARSED', JSON.stringify(data))],
-        ['STEERING_MANIFEST_LOADED', (_, data) => console.log('STEERING_MANIFEST_LOADED', JSON.stringify(data))],
-        // ['LEVEL_SWITCHING', (_, data) => console.log('LEVEL_SWITCHING', JSON.stringify(data))],
-        ['LEVEL_SWITCHED', (_, data) => console.log('LEVEL_SWITCHED', JSON.stringify(data))],
-        ['LEVEL_LOADING', (_, data) => console.log('LEVEL_LOADING', JSON.stringify(data))],
-        ['LEVEL_LOADED', (_, data) => console.log('LEVEL_LOADED', JSON.stringify(data))],
-        // ['LEVEL_UPDATED', (_, data) => console.log('LEVEL_UPDATED', JSON.stringify(data))],
-        // ['LEVEL_PTS_UPDATED', (_, data) => console.log('LEVEL_PTS_UPDATED', JSON.stringify(data))],
-        ['LEVELS_UPDATED', (_, data) => console.log('LEVELS_UPDATED', JSON.stringify(data))],
-        ['AUDIO_TRACKS_UPDATED', (_, data) => console.log('AUDIO_TRACKS_UPDATED', JSON.stringify(data))],
-        ['AUDIO_TRACK_SWITCHING', (_, data) => console.log('AUDIO_TRACK_SWITCHING', JSON.stringify(data))],
-        ['AUDIO_TRACK_SWITCHED', (_, data) => console.log('AUDIO_TRACK_SWITCHED', JSON.stringify(data))],
-        ['AUDIO_TRACK_LOADING', (_, data) => console.log('AUDIO_TRACK_LOADING', JSON.stringify(data))],
-        ['AUDIO_TRACK_LOADED', (_, data) => console.log('AUDIO_TRACK_LOADED', JSON.stringify(data))],
-        ['SUBTITLE_TRACKS_UPDATED', (_, data) => console.log('SUBTITLE_TRACKS_UPDATED', JSON.stringify(data))],
-        ['SUBTITLE_TRACK_SWITCH', (_, data) => console.log('SUBTITLE_TRACK_SWITCH', JSON.stringify(data))],
-        ['SUBTITLE_TRACK_LOADING', (_, data) => console.log('SUBTITLE_TRACK_LOADING', JSON.stringify(data))],
-        ['SUBTITLE_TRACK_LOADED', (_, data) => console.log('SUBTITLE_TRACK_LOADED', JSON.stringify(data))],
-        ['SUBTITLE_FRAG_PROCESSED', (_, data) => console.log('SUBTITLE_FRAG_PROCESSED', JSON.stringify(data))],
-        // ['INIT_PTS_FOUND', (_, data) => console.log('INIT_PTS_FOUND', JSON.stringify(data))],
-        ['FRAG_LOADING', (_, data) => console.log('FRAG_LOADING', JSON.stringify(data))],
-        ['FRAG_LOAD_EMERGENCY_ABORTED', (_, data) => console.log('FRAG_LOAD_EMERGENCY_ABORTED', JSON.stringify(data))],
-        // ['FRAG_LOADED', (_, data) => console.log('FRAG_LOADED', JSON.stringify(data))],
-        ['FRAG_DECRYPTED', (_, data) => console.log('FRAG_DECRYPTED', JSON.stringify(data))],
-        // ['FRAG_PARSING_INIT_SEGMENT', (_, data) => console.log('FRAG_PARSING_INIT_SEGMENT', JSON.stringify(data))],
-        ['FRAG_PARSING_USERDATA', (_, data) => console.log('FRAG_PARSING_USERDATA', JSON.stringify(data))],
-        ['FRAG_PARSING_METADATA', (_, data) => console.log('FRAG_PARSING_METADATA', JSON.stringify(data))],
-        // ['FRAG_PARSED', (_, data) => console.log('FRAG_PARSED', JSON.stringify(data))],
-        // ['FRAG_BUFFERED', (_, data) => console.log('FRAG_BUFFERED', JSON.stringify(data))],
-        // ['FRAG_CHANGED', (_, data) => console.log('FRAG_CHANGED', JSON.stringify(data))],
-        ['FPS_DROP', (_, data) => console.log('FPS_DROP', JSON.stringify(data))],
-        ['FPS_DROP_LEVEL_CAPPING', (_, data) => console.log('FPS_DROP_LEVEL_CAPPING', JSON.stringify(data))],
-        ['ERROR', (_, data) => console.log('ERROR', JSON.stringify(data))],
-        ['DESTROYING', (_, data) => console.log('DESTROYING', JSON.stringify(data))],
-        ['KEY_LOADING', (_, data) => console.log('KEY_LOADING', JSON.stringify(data))],
-        ['KEY_LOADED', (_, data) => console.log('KEY_LOADED', JSON.stringify(data))],
-        ['NON_NATIVE_TEXT_TRACKS_FOUND', (_, data) => console.log('NON_NATIVE_TEXT_TRACKS_FOUND', JSON.stringify(data))],
-        ['CUES_PARSED', (_, data) => console.log('CUES_PARSED', JSON.stringify(data))]
-      ];
-
-      // Add all event listeners
-      hlsEvents.forEach(([event, handler]) => {
-        if (hlsRef.current)
-          hlsRef.current.on(Hls.Events[event], handler);
-      });
-
-      // Cleanup function
-      return () => {
-        if (!hlsRef.current) return;
-        hlsEvents.forEach(([event, handler]) => {
-          if (hlsRef.current)
-            hlsRef.current.off(Hls.Events[event], handler);
-        });
-      };
-    }, [hlsRef]);
-  };
-
-
-
 const PodcastControls: React.FC<{
   episode: Episode;
   episodeNumber: number;
@@ -624,7 +476,7 @@ const PodcastControls: React.FC<{
   const [skipAmount, setSkipAmount] = useState(5);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
 
-  const hlsRef = useHlsPlayer(episode, videoRef);
+  // const hlsRef = useHlsPlayer(episode, videoRef);
   // useMediaEventLoggers(videoRef);
   // useHlsEventLoggers(hlsRef);
 
