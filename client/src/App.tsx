@@ -600,34 +600,70 @@ interface EpisodeListResponse {
 
 const EpisodeList: React.FC = () => {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [episodesPerPage, setEpisodesPerPage] = useState<number>(10);
+  const [currentOffset, setCurrentOffset] = useState<number>(0);
+  const [totalEpisodes, setTotalEpisodes] = useState<number>(0);
 
   useEffect(() => {
     const fetchEpisodes = async () => {
       try {
-        const response = await fetch('/api/episodes?limit=50&offset=50&direction=asc');
+        const response = await fetch(`/api/episodes?limit=${episodesPerPage}&offset=${currentOffset}&direction=asc`);
         if (!response.ok) {
           throw new Error('Failed to fetch episodes');
         }
         const data: EpisodeListResponse = await response.json();
         setEpisodes(data.episodes);
+        setTotalEpisodes(data.total);
       } catch (error) {
         console.error('Error fetching episodes:', error);
       }
     };
 
     fetchEpisodes();
-  }, []);
+  }, [episodesPerPage, currentOffset]);
+
+  const handleEpisodesPerPageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const episodes_per_page = Number(event.target.value);
+    setEpisodesPerPage(episodes_per_page);
+    setCurrentOffset(currentOffset - (currentOffset % episodes_per_page));
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentOffset((prevOffset: number) => Math.max(prevOffset - episodesPerPage, 0));
+  };
+
+  const handleNextPage = () => {
+    setCurrentOffset((prevOffset: number) => Math.min(prevOffset + episodesPerPage, totalEpisodes - episodesPerPage));
+  };
+
+  const startEpisode = currentOffset + 1;
+  const endEpisode = Math.min(currentOffset + episodesPerPage, totalEpisodes);
 
   return (
-    <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px', border: '1px solid #ccc' }}>
-      {episodes.map((episode) => (
-        <div key={episode.id} style={{ marginBottom: '20px' }}>
-          <h3>{episode.title}</h3>
-          <p>{episode.description}</p>
-          <p>Duration: {episode.duration} minutes</p>
-          <p>Published: {episode.publishDate}</p>
-        </div>
-      ))}
+    <div>
+      <div style={{ marginBottom: '20px' }}>
+        <label htmlFor="episodesPerPage">Episodes per page:</label>
+        <select id="episodesPerPage" value={episodesPerPage} onChange={handleEpisodesPerPageChange}>
+          {[10, 25, 50, 100, 250].map((v) => <option value={v}>{v}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom: '20px' }}>
+        <button onClick={handlePreviousPage} disabled={currentOffset === 0}>Previous</button>
+        <button onClick={handleNextPage} disabled={endEpisode >= totalEpisodes}>Next</button>
+        <span style={{ margin: '0 10px' }}>
+          {startEpisode}-{endEpisode} of {totalEpisodes}
+        </span>
+      </div>
+      <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px', border: '1px solid #ccc' }}>
+        {episodes.map((episode) => (
+          <div key={episode.id} style={{ marginBottom: '20px' }}>
+            <h3>#{episode.id} {episode.title}</h3>
+            <p>{episode.description}</p>
+            <p>Duration: {episode.duration} minutes</p>
+            <p>Published: {episode.publishDate}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

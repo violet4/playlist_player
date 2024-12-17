@@ -397,7 +397,7 @@ class EpisodeListResponse(BaseModel):
 
 @app.get("/episodes", response_model=EpisodeListResponse)
 async def get_episodes(
-    limit: int = Query(default=10, ge=1, le=100),
+    limit: int = Query(default=10, ge=1, le=250),
     offset: int = Query(default=0, ge=0),
     direction: str = Query(default="desc", regex="^(asc|desc)$")
 ):
