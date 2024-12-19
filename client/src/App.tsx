@@ -569,7 +569,7 @@ const PodcastPlayer = () => {
         handleNext={handleNext}
         fetchEpisodeByNumber={fetchEpisodeByNumber}
       />
-      <EpisodeList />
+      <EpisodeList startEpisodeNumber={episode.episode_number} />
     </div>
   );
 };
@@ -606,9 +606,16 @@ interface PaginationResult {
   handleNextPage: () => void;
 }
 
-const usePagination = (totalEpisodes: number): PaginationResult => {
-  const [episodesPerPage, setEpisodesPerPage] = useState<number>(10);
-  const [currentOffset, setCurrentOffset] = useState<number>(0);
+const calculateStartPage = (startEpisodeNumber: number, episodesPerPage: number) => {
+  const offsetStart = startEpisodeNumber - 1;
+  const result = offsetStart - (offsetStart % episodesPerPage);
+  return result;
+};
+
+const usePagination = (totalEpisodes: number, startEpisodeNumber: number): PaginationResult => {
+  const startEpisodesPerPage = 10;
+  const [episodesPerPage, setEpisodesPerPage] = useState<number>(startEpisodesPerPage);
+  const [currentOffset, setCurrentOffset] = useState<number>(calculateStartPage(startEpisodeNumber, episodesPerPage));
 
   const handleEpisodesPerPageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newEpisodesPerPage = Number(event.target.value);
@@ -659,7 +666,11 @@ const useFetchEpisodes = (episodesPerPage: number, currentOffset: number, setTot
 };
 
 
-const EpisodeList: React.FC = () => {
+interface EpisodeListProps {
+  startEpisodeNumber: number;
+}
+
+const EpisodeList: React.FC<EpisodeListProps> = ({startEpisodeNumber}) => {
   const [totalEpisodes, setTotalEpisodes] = useState<number>(0);
   const {
     currentOffset,
@@ -667,7 +678,7 @@ const EpisodeList: React.FC = () => {
     handleEpisodesPerPageChange,
     handlePreviousPage,
     handleNextPage,
-  } = usePagination(totalEpisodes);
+  } = usePagination(totalEpisodes, startEpisodeNumber);
 
   const episodes = useFetchEpisodes(episodesPerPage, currentOffset, setTotalEpisodes);
 
