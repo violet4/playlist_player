@@ -93,6 +93,18 @@ I, Violet, promise:
 * To never compromise these principles for convenience, even if it is to my or the app's perceived detriment
 * To build and maintain user trust through consistent adherence to these standards
 
+## Development Setup
+
+After cloning the repository, install development dependencies:
+
+    poetry install --group=dev
+
+Enable Git hooks:
+
+    git config core.hooksPath .githooks
+
+This will cause your `git commit` to automatically invoke `cz` (commitizen) with helpful custom prompt messages, helping you make commit messages that are simultaneously machine- and human-friendly.
+
 ## Credits
 
 * The lovely FOSS libraries being used (see `pyproject.toml` and `client/package.json` if you want to see the list of packages)

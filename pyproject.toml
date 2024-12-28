@@ -23,7 +23,12 @@ tinytag = "^1.10.1"
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.28.0"
 ipdb = "^0.13.13"
+cz-podcast = {path = "cz_podcast", develop = true}
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.commitizen]
+name = "cz_podcast"
+

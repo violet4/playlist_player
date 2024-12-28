@@ -1,0 +1,3 @@
+#!/bin/bash
+exec </dev/tty poetry run cz -n cz_podcast c --write-message-to-file .git/COMMIT_EDITMSG --dry-run
+# git commit -F commit.md
