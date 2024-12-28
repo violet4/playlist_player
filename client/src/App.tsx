@@ -506,11 +506,13 @@ const PodcastControls: React.FC<{
   const SeekForward10Sec = () => <SeekForwardButton seconds={10} />;
   const SeekForward20Sec = () => <SeekForwardButton seconds={20} />;
   const SeekForward30Sec = () => <SeekForwardButton seconds={30} />;
+  const SeekForward60Sec = () => <SeekForwardButton seconds={60} />;
   const SeekForwardButtonSkipAmount = () => <SeekForwardButton seconds={skipAmount} />;
 
   const SeekBackward10Sec = () => <SeekBackwardButton seconds={10} />;
   const SeekBackward20Sec = () => <SeekBackwardButton seconds={20} />;
   const SeekBackward30Sec = () => <SeekBackwardButton seconds={30} />;
+  const SeekBackward60Sec = () => <SeekBackwardButton seconds={60} />;
   const SeekBackwardButtonSkipAmount = () => <SeekBackwardButton seconds={skipAmount} />;
 
 
@@ -520,8 +522,8 @@ const PodcastControls: React.FC<{
   const NextEpisodeButton = () => <button onClick={handleNext}>Next</button>;
   const SkipSecondsWidget = () => <div>
 
-    <SeekBackward30Sec /><SeekBackward20Sec /><SeekBackward10Sec />
-    <SeekForward10Sec /><SeekForward20Sec /><SeekForward30Sec />
+    <SeekBackward60Sec /><SeekBackward30Sec /><SeekBackward20Sec /><SeekBackward10Sec />
+    <SeekForward10Sec /><SeekForward20Sec /><SeekForward30Sec /><SeekForward60Sec />
     <br/>
 
     <SeekBackwardButtonSkipAmount /><SeekForwardButtonSkipAmount />
