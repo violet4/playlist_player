@@ -491,7 +491,9 @@ const PodcastControls: React.FC<{
     return <div>Loading...</div>;
   }
 
-  const seek_style = {width: '50px', height: '50px'};
+  const skip_button_count = 8;
+  const seek_style = {width: `${100/skip_button_count}%`, height: '50px'};
+
   const SeekButton = ({direction, seconds}: {direction: "forward"|"backward", seconds: number}) => <button
     style={seek_style}
     onClick={() => { if (videoRef.current) videoRef.current.currentTime += (Number(direction=='forward')*2-1) * seconds; }}>
