@@ -683,6 +683,7 @@ const EpisodeList: React.FC<EpisodeListProps> = ({startEpisodeNumber}) => {
     handlePreviousPage,
     handleNextPage,
   } = usePagination(totalEpisodes, startEpisodeNumber);
+  const [showEpisodeDetails, setShowEpisodeDetails] = useState(false);
 
   const episodes = useFetchEpisodes(episodesPerPage, currentOffset, setTotalEpisodes);
 
@@ -703,14 +704,21 @@ const EpisodeList: React.FC<EpisodeListProps> = ({startEpisodeNumber}) => {
         <span style={{ margin: '0 10px' }}>
           {startIndex}-{endIndex} of {totalEpisodes}
         </span>
+        <span>
+          <input id="show_episode_details" type="checkbox" onChange={(e) => setShowEpisodeDetails(e.target.checked)} />
+          &nbsp;
+          <label htmlFor="show_episode_details">Show Episode Details</label>
+        </span>
       </div>
-      <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px', border: '1px solid #ccc' }}>
+      <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ccc' }}>
         {episodes.map((episode) => (
-          <div key={episode.id} style={{ marginBottom: '20px' }}>
-            <h3>#{episode.id} {episode.title}</h3>
-            <p>{episode.description}</p>
-            <p>Duration: {episode.duration} minutes</p>
-            <p>Published: {episode.publishDate}</p>
+          <div key={episode.id} style={{}}>
+            <h3 style={{margin: '0px'}}>#{episode.id} {episode.title}</h3>
+            <div className="episode-details" hidden={!showEpisodeDetails}>
+              <p>{episode.description}</p>
+              <p>Duration: {episode.duration} minutes</p>
+              <p>Published: {episode.publishDate}</p>
+            </div>
           </div>
         ))}
       </div>
