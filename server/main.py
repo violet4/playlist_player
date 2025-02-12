@@ -66,7 +66,7 @@ class CurrentEpisodeRememberer:
 
 
 class AudioCache:
-    def __init__(self, max_episodes: int = 6):
+    def __init__(self, max_episodes: int = 2):
         self.max_episodes = max_episodes
         self.cache: Dict[str, AudioSegment] = {}
         self.access_times: Dict[str, float] = {}
@@ -393,6 +393,11 @@ class EpisodeListResponse(BaseModel):
 # def list_episodes(page: int = Query(1, ge=1), per_page: int = Query(10, le=100)):
 #     episodes = podcast_playlist.list_episodes(page=page, per_page=per_page)
 #     return episodes
+
+@app.get("/cache_count")
+async def get_cache_count():
+    global audio_cache
+    return {'cache_count': len(audio_cache.cache)}
 
 
 @app.get("/episodes", response_model=EpisodeListResponse)

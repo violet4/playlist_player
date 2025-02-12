@@ -574,6 +574,7 @@ const PodcastPlayer = () => {
         fetchEpisodeByNumber={fetchEpisodeByNumber}
       />
       <EpisodeList startEpisodeNumber={episode.episode_number} />
+      <CacheCount episode_number={episode.episode_number} />
     </div>
   );
 };
@@ -669,6 +670,17 @@ const useFetchEpisodes = (episodesPerPage: number, currentOffset: number, setTot
   return episodes;
 };
 
+const CacheCount = ({episode_number}: {episode_number: number}) => {
+  const [cacheCount, setCacheCount] = useState(0);
+  useEffect(() => {
+    fetch('/cache_count').then(resp => resp.json()).then(data => setCacheCount(data));
+  }, [episode_number]);
+  return (
+    <div>
+      Cache Item Count: {cacheCount}
+    </div>
+  );
+};
 
 interface EpisodeListProps {
   startEpisodeNumber: number;
