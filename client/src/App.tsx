@@ -673,7 +673,7 @@ const useFetchEpisodes = (episodesPerPage: number, currentOffset: number, setTot
 const CacheCount = ({episode_number}: {episode_number: number}) => {
   const [cacheCount, setCacheCount] = useState(0);
   useEffect(() => {
-    fetch('/cache_count').then(resp => resp.json()).then(data => setCacheCount(data));
+    fetch('/api/cache_count').then(resp => resp.json()).then(data => setCacheCount(data));
   }, [episode_number]);
   return (
     <div>
