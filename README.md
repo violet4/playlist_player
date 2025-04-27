@@ -2,8 +2,6 @@
 
 A playlist generator, manager, and player.
 
-See the [introduction on my blog](https://violeteldridge.com/dev/dw10/).
-
 ## Install and Run
 
 This is a brand-new project (2024-10-26). If you run into any issues getting it installed and running, please [create an issue](https://github.com/violet4/playlist_player/issues/new) and we'll prioritize making the application easier to install.
